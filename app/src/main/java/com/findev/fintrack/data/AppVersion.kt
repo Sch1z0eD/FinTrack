@@ -9,6 +9,42 @@ data class AvailableUpdate(
 )
 
 /**
+ * Which stream of releases a build follows. The two are separate applications with separate
+ * data, so a beta can be installed and updated without touching the stable one.
+ */
+enum class ReleaseChannel { STABLE, BETA }
+
+/** A parsed release tag. */
+data class ReleaseTag(
+    val versionName: String,
+    val versionCode: Long,
+    val channel: ReleaseChannel,
+)
+
+/**
+ * Parses `v1.2.3` and `v1.2.3-beta`.
+ *
+ * Version numbers are shared across the two channels and simply keep marching upwards -
+ * a beta at 1.2.4 followed by a stable at 1.2.5. Nothing has to keep two counters in step,
+ * and because the channels are separate applications, a beta and a stable at the same
+ * number never meet.
+ */
+fun parseReleaseTag(tag: String): ReleaseTag? {
+    val withoutPrefix = tag.removePrefix("v")
+    val isBeta = withoutPrefix.endsWith(BETA_SUFFIX)
+    val numbers = if (isBeta) withoutPrefix.removeSuffix(BETA_SUFFIX) else withoutPrefix
+
+    val code = versionCodeFromTag(numbers) ?: return null
+    return ReleaseTag(
+        versionName = withoutPrefix,
+        versionCode = code,
+        channel = if (isBeta) ReleaseChannel.BETA else ReleaseChannel.STABLE,
+    )
+}
+
+private const val BETA_SUFFIX = "-beta"
+
+/**
  * Makes GitHub's release body readable in a plain Text.
  *
  * The notes are Markdown and the update card renders them as-is, so `**bold**` arrives with

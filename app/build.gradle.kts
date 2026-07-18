@@ -29,8 +29,10 @@ android {
 
     buildFeatures {
         compose = true
-        // AGP 9 turns resValue off by default; the build types use it for app_name.
+        // AGP 9 turns both off by default; the build types use them for app_name and the
+        // release channel.
         resValues = true
+        buildConfig = true
     }
 
     // Only configured in CI, where the keystore arrives through secrets. Without it a
@@ -57,16 +59,32 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             resValue("string", "app_name", "FinTrack dev")
+            // Points at the beta stream so the update screen has something to find, but it
+            // cannot install what it downloads: this is a different application id, signed
+            // with the debug key. Installing an update is what the beta build is for.
+            buildConfigField("String", "RELEASE_CHANNEL", "\"BETA\"")
         }
 
         release {
             resValue("string", "app_name", "FinTrack")
+            buildConfigField("String", "RELEASE_CHANNEL", "\"STABLE\"")
             optimization {
                 enable = false
             }
             if (keystorePath != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
+        }
+
+        // A shippable build that is not the real app: same release key, so it can update
+        // itself from GitHub, but its own application id and data. This is where the whole
+        // download-and-install path gets exercised without risking the stable install.
+        create("beta") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".beta"
+            versionNameSuffix = "-beta"
+            resValue("string", "app_name", "FinTrack beta")
+            buildConfigField("String", "RELEASE_CHANNEL", "\"BETA\"")
         }
     }
     compileOptions {

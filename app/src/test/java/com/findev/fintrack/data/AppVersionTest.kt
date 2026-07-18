@@ -46,6 +46,43 @@ class AppVersionTest {
     }
 
     @Test
+    fun `a plain tag is the stable channel`() {
+        val tag = parseReleaseTag("v1.2.3")!!
+
+        assertEquals(ReleaseChannel.STABLE, tag.channel)
+        assertEquals("1.2.3", tag.versionName)
+        assertEquals(10203L, tag.versionCode)
+    }
+
+    @Test
+    fun `a beta suffix switches the channel without changing the number`() {
+        val beta = parseReleaseTag("v1.2.3-beta")!!
+
+        assertEquals(ReleaseChannel.BETA, beta.channel)
+        assertEquals("1.2.3-beta", beta.versionName)
+        // Same code as the stable of that version: the channels are separate apps, so their
+        // version codes never have to avoid each other.
+        assertEquals(10203L, beta.versionCode)
+    }
+
+    @Test
+    fun `versions keep climbing across channels`() {
+        val beta = parseReleaseTag("v0.2.4-beta")!!
+        val stable = parseReleaseTag("v0.2.5")!!
+
+        assert(stable.versionCode > beta.versionCode)
+    }
+
+    @Test
+    fun `an unknown suffix is refused rather than treated as stable`() {
+        // Offering an alpha to a stable install would be exactly the accident the channels
+        // are meant to prevent.
+        assertNull(parseReleaseTag("v1.2.3-alpha"))
+        assertNull(parseReleaseTag("v1.2.3-beta.1"))
+        assertNull(parseReleaseTag("v1.2.3-BETA"))
+    }
+
+    @Test
     fun `release notes lose their markdown and generated noise`() {
         val raw = """
             ## What's Changed

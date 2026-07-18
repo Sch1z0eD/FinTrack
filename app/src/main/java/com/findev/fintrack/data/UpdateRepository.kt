@@ -7,7 +7,9 @@ import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import com.findev.fintrack.BuildConfig
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -17,7 +19,13 @@ import javax.inject.Singleton
 private const val LATEST_RELEASE_URL =
     "https://api.github.com/repos/Sch1z0eD/FinTrack/releases/latest"
 
+private const val RELEASES_URL =
+    "https://api.github.com/repos/Sch1z0eD/FinTrack/releases?per_page=20"
+
 const val RELEASES_PAGE_URL = "https://github.com/Sch1z0eD/FinTrack/releases"
+
+/** Release assets are named fintrack-1.2.3.apk and fintrack-beta-1.2.3.apk. */
+private const val BETA_ASSET_MARKER = "-beta-"
 
 /** The repository exists but has never published a release. */
 class NoReleasesYetException : Exception("No releases published yet")
@@ -38,6 +46,11 @@ private const val READ_TIMEOUT_MS = 15_000
 class UpdateRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
+    /** Fixed at build time: a beta build never looks at the stable stream, or vice versa. */
+    private val channel: ReleaseChannel =
+        runCatching { ReleaseChannel.valueOf(BuildConfig.RELEASE_CHANNEL) }
+            .getOrDefault(ReleaseChannel.STABLE)
+
     /** Version code of the APK currently running. */
     val installedVersionCode: Long
         get() = context.packageManager
@@ -56,29 +69,53 @@ class UpdateRepository @Inject constructor(
      */
     suspend fun fetchLatest(): Result<AvailableUpdate?> = withContext(Dispatchers.IO) {
         runCatching {
-            val body = get(LATEST_RELEASE_URL)
-            val json = JSONObject(body)
+            val release = latestReleaseForChannel() ?: throw NoReleasesYetException()
 
-            val tag = json.getString("tag_name")
-            val versionCode = versionCodeFromTag(tag)
-                ?: error("Release tag \"$tag\" is not vMAJOR.MINOR.PATCH")
+            val tag = release.getString("tag_name")
+            val parsed = parseReleaseTag(tag)
+                ?: error("Release tag $tag is not vMAJOR.MINOR.PATCH")
 
-            if (versionCode <= installedVersionCode) return@runCatching null
-
-            val assets = json.getJSONArray("assets")
-            val apkUrl = (0 until assets.length())
-                .map { assets.getJSONObject(it) }
-                .firstOrNull { it.getString("name").endsWith(".apk", ignoreCase = true) }
-                ?.getString("browser_download_url")
-                ?: error("Release $tag has no APK attached")
+            if (parsed.versionCode <= installedVersionCode) return@runCatching null
 
             AvailableUpdate(
-                versionName = tag.removePrefix("v"),
-                versionCode = versionCode,
-                apkUrl = apkUrl,
-                notes = formatReleaseNotes(json.optString("body")),
+                versionName = parsed.versionName,
+                versionCode = parsed.versionCode,
+                apkUrl = apkAssetUrl(release, tag),
+                notes = formatReleaseNotes(release.optString("body")),
             )
         }
+    }
+
+    /**
+     * Stable reads /releases/latest, which GitHub already defines as "newest non-prerelease" -
+     * so a beta can never be offered to a stable install by accident. Beta has to walk the
+     * list itself, because that endpoint would hide exactly what it is looking for.
+     */
+    private fun latestReleaseForChannel(): JSONObject? = when (channel) {
+        ReleaseChannel.STABLE -> JSONObject(get(LATEST_RELEASE_URL))
+
+        ReleaseChannel.BETA -> {
+            val releases = JSONArray(get(RELEASES_URL))
+            (0 until releases.length())
+                .map { releases.getJSONObject(it) }
+                .firstOrNull { release ->
+                    parseReleaseTag(release.getString("tag_name"))?.channel == ReleaseChannel.BETA
+                }
+        }
+    }
+
+    /** Both APKs may hang off one release, so the name decides which one belongs to us. */
+    private fun apkAssetUrl(release: JSONObject, tag: String): String {
+        val assets = release.getJSONArray("assets")
+        val apks = (0 until assets.length())
+            .map { assets.getJSONObject(it) }
+            .filter { it.getString("name").endsWith(".apk", ignoreCase = true) }
+
+        val wantsBeta = channel == ReleaseChannel.BETA
+        return apks
+            .firstOrNull { it.getString("name").contains(BETA_ASSET_MARKER) == wantsBeta }
+            ?.getString("browser_download_url")
+            ?: error("Release $tag has no APK for the $channel channel")
     }
 
     private fun get(url: String): String {
