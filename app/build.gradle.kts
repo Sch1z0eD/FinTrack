@@ -29,6 +29,8 @@ android {
 
     buildFeatures {
         compose = true
+        // AGP 9 turns resValue off by default; the build types use it for app_name.
+        resValues = true
     }
 
     // Only configured in CI, where the keystore arrives through secrets. Without it a
@@ -48,7 +50,17 @@ android {
     }
 
     buildTypes {
+        // A separate application id, so the build from Android Studio installs alongside the
+        // release rather than fighting it for one slot. They are signed with different keys
+        // and Android refuses to replace an app with a differently signed one; without the
+        // suffix, every switch between the two would mean uninstalling and losing the data.
+        debug {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "FinTrack dev")
+        }
+
         release {
+            resValue("string", "app_name", "FinTrack")
             optimization {
                 enable = false
             }

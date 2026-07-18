@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">FinTrack</string>
 
     <string name="nav_overview">Обзор</string>
     <string name="nav_transactions">Операции</string>
