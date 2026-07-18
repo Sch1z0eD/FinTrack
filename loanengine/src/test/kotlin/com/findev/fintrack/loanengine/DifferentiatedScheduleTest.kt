@@ -9,17 +9,17 @@ class DifferentiatedScheduleTest {
 
     private fun loan(
         principalMinor: Long = 120_000_00,
-        annualRateBp: Int = 1200,
+        annualRateMilliPercent: Int = 12000,
         termMonths: Int = 12,
         startDate: LocalDate = LocalDate.of(2026, 1, 15),
         paymentDay: Int = 15,
-    ) = Loan(LoanType.DIFFERENTIATED, principalMinor, annualRateBp, startDate, termMonths, paymentDay)
+    ) = Loan(LoanType.DIFFERENTIATED, principalMinor, annualRateMilliPercent, startDate, termMonths, paymentDay)
 
     @Test
     fun firstPaymentMatchesTheHandCalculation() {
         // 120 000 руб. под 12% на 12 мес: тело = 120000/12 = 10 000 руб. каждый месяц.
         // Проценты за 15.01 -> 15.02 (31 день, база 365) на остаток 120 000:
-        //   12000000 * 1200 * 31 / (10000 * 365) = 122 301,369... -> 122 301 коп.
+        //   12000000 * 12000 * 31 / (100000 * 365) = 122 301,369... -> 122 301 коп.
         // Платёж = 1 000 000 + 122 301 = 1 122 301 коп. = 11 223,01 руб.
         val first = generateSchedule(loan()).first()
 
@@ -79,7 +79,7 @@ class DifferentiatedScheduleTest {
         val schedule = generateSchedule(
             loan(
                 principalMinor = 120_000_00,
-                annualRateBp = 1200,
+                annualRateMilliPercent = 12000,
                 termMonths = 12,
                 startDate = LocalDate.of(2027, 1, 1),
                 paymentDay = 1,
@@ -96,7 +96,7 @@ class DifferentiatedScheduleTest {
 
     @Test
     fun zeroRateIsPurePrincipal() {
-        val schedule = generateSchedule(loan(annualRateBp = 0))
+        val schedule = generateSchedule(loan(annualRateMilliPercent = 0))
 
         assertTrue(schedule.all { it.interestMinor == 0L })
         assertTrue(schedule.all { it.paymentMinor == 1_000_000L })

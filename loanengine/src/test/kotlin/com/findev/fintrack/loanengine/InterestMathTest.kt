@@ -13,7 +13,7 @@ class InterestMathTest {
 
     /** 1 000 000 roubles. */
     private val balance = 1_000_000_00L
-    private val rate12Percent = 1200
+    private val rate12Percent = 12000
 
     @Test
     fun annuityPaymentMatchesThePublishedFigure() {
@@ -21,7 +21,7 @@ class InterestMathTest {
         // i = 0.01, 1.01^12 = 1.12682503..., A = P*i*(1+i)^n / ((1+i)^n - 1).
         val payment = annuityPaymentMinor(
             principalMinor = 1_000_000_00,
-            annualRateBp = rate12Percent,
+            annualRateMilliPercent = rate12Percent,
             termMonths = 12,
         )
 
@@ -30,19 +30,19 @@ class InterestMathTest {
 
     @Test
     fun zeroRatePaymentIsJustThePrincipalSplitEvenly() {
-        assertEquals(10_000_00L, annuityPaymentMinor(120_000_00, annualRateBp = 0, termMonths = 12))
+        assertEquals(10_000_00L, annuityPaymentMinor(120_000_00, annualRateMilliPercent = 0, termMonths = 12))
     }
 
     @Test
     fun interestFollowsActualDaysOfTheMonth() {
         // February 2027: 28 days, common year base 365.
-        // 100000000 * 1200 * 28 / (10000 * 365) = 920 547,945... -> 920 548
+        // 100000000 * 12000 * 28 / (100000 * 365) = 920 547,945... -> 920 548
         val february = exactInterest(
             balance, rate12Percent, LocalDate.of(2027, 2, 1), LocalDate.of(2027, 3, 1),
         ).toKopecksHalfUp()
         assertEquals(920_548L, february)
 
-        // March 2027: 31 days. 100000000 * 1200 * 31 / (10000 * 365) = 1 019 178,08 -> 1 019 178
+        // March 2027: 31 days. 100000000 * 12000 * 31 / (100000 * 365) = 1 019 178,08 -> 1 019 178
         val march = exactInterest(
             balance, rate12Percent, LocalDate.of(2027, 3, 1), LocalDate.of(2027, 4, 1),
         ).toKopecksHalfUp()
@@ -55,7 +55,7 @@ class InterestMathTest {
     @Test
     fun leapFebruaryUsesBase366AndItsExtraDay() {
         // February 2028: 29 days, leap year base 366.
-        // 100000000 * 1200 * 29 / (10000 * 366) = 950 819,672... -> 950 820
+        // 100000000 * 12000 * 29 / (100000 * 366) = 950 819,672... -> 950 820
         val leapFebruary = exactInterest(
             balance, rate12Percent, LocalDate.of(2028, 2, 1), LocalDate.of(2028, 3, 1),
         ).toKopecksHalfUp()
@@ -67,8 +67,8 @@ class InterestMathTest {
     fun periodAcrossNewYearSplitsBetweenBothYearBases() {
         // 15.12.2027 -> 15.01.2028 is 31 days: 17 of them in 2027 (base 365) and
         // 14 in 2028, which is a leap year (base 366).
-        // 17 days: 100000000 * 1200 * 17 / (10000 * 365) =   558 904,109...
-        // 14 days: 100000000 * 1200 * 14 / (10000 * 366) =   459 016,393...
+        // 17 days: 100000000 * 12000 * 17 / (100000 * 365) =   558 904,109...
+        // 14 days: 100000000 * 12000 * 14 / (100000 * 366) =   459 016,393...
         //                                          total = 1 017 920,503  -> 1 017 921
         val actual = exactInterest(
             balance, rate12Percent, LocalDate.of(2027, 12, 15), LocalDate.of(2028, 1, 15),

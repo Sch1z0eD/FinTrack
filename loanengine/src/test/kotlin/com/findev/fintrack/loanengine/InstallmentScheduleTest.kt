@@ -17,7 +17,7 @@ class InstallmentScheduleTest {
     ) = Loan(
         type = LoanType.INSTALLMENT,
         principalMinor = principalMinor,
-        annualRateBp = 0,
+        annualRateMilliPercent = 0,
         startDate = startDate,
         termMonths = termMonths,
         paymentDay = paymentDay,
@@ -123,7 +123,7 @@ class InstallmentScheduleTest {
             Loan(
                 type = LoanType.ANNUITY,
                 principalMinor = 1_000_000_00,
-                annualRateBp = 1200,
+                annualRateMilliPercent = 12000,
                 startDate = LocalDate.of(2026, 1, 15),
                 termMonths = 12,
                 paymentDay = 15,

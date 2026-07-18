@@ -28,7 +28,7 @@ class InterestOnlyScheduleTest {
     private fun realLoan() = Loan(
         type = LoanType.INTEREST_ONLY,
         principalMinor = 102_300_00,
-        annualRateBp = 1990,
+        annualRateMilliPercent = 19900,
         startDate = LocalDate.of(2026, 7, 5),
         termMonths = 60,
         paymentDay = 5,
@@ -60,7 +60,7 @@ class InterestOnlyScheduleTest {
     }
 
     /**
-     * 05.07 -> 05.08 is 31 days: 102300 x 1990 x 31 / (10000 x 365) = 1 729,01.
+     * 05.07 -> 05.08 is 31 days: 102300 x 19900 x 31 / (100000 x 365) = 1 729,01.
      * Hand-computed, and it is also why the payment is not level - a 28-day February
      * costs less than a 31-day August on the very same balance.
      */

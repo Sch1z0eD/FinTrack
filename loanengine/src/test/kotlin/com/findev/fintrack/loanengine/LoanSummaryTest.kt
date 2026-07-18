@@ -13,7 +13,7 @@ class LoanSummaryTest {
     private fun instalment(upfrontFeeMinor: Long = 0, monthlyFeeMinor: Long = 0) = Loan(
         type = LoanType.INSTALLMENT,
         principalMinor = 60_000_00,
-        annualRateBp = 0,
+        annualRateMilliPercent = 0,
         startDate = start,
         termMonths = 6,
         paymentDay = 15,
@@ -21,7 +21,7 @@ class LoanSummaryTest {
         monthlyFeeMinor = monthlyFeeMinor,
     )
 
-    private fun annuity() = Loan(LoanType.ANNUITY, 1_000_000_00, 1200, start, 12, paymentDay = 15)
+    private fun annuity() = Loan(LoanType.ANNUITY, 1_000_000_00, 12000, start, 12, paymentDay = 15)
 
     @Test
     fun anHonestInstalmentCostsNothingExtra() {

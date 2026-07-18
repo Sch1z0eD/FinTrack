@@ -13,8 +13,8 @@ class PrepaymentScheduleTest {
     private fun interestFree(type: LoanType = LoanType.INSTALLMENT) =
         Loan(type, 120_000_00, 0, start, 12, paymentDay = 15)
 
-    private fun annuity(rateBp: Int = 1200) =
-        Loan(LoanType.ANNUITY, 1_000_000_00, rateBp, start, 12, paymentDay = 15)
+    private fun annuity(rateMilliPercent: Int = 12000) =
+        Loan(LoanType.ANNUITY, 1_000_000_00, rateMilliPercent, start, 12, paymentDay = 15)
 
     @Test
     fun reduceTermKeepsThePaymentAndEndsTheLoanEarlier() {
@@ -97,8 +97,8 @@ class PrepaymentScheduleTest {
     @Test
     fun prepaymentMidPeriodSplitsThatPeriodsInterest() {
         // 15.01 -> 15.02, 1 000 000 руб. под 12%, 500 000 руб. досрочно 01.02:
-        //   17 дней на 1 000 000: 100000000 * 1200 * 17 / (10000 * 365) = 558 904,109...
-        //   14 дней на   500 000:  50000000 * 1200 * 14 / (10000 * 365) = 230 136,986...
+        //   17 дней на 1 000 000: 100000000 * 12000 * 17 / (100000 * 365) = 558 904,109...
+        //   14 дней на   500 000:  50000000 * 12000 * 14 / (100000 * 365) = 230 136,986...
         //                                                 итого 789 041,095 -> 789 041
         val schedule = generateSchedule(
             annuity(),
@@ -154,7 +154,7 @@ class PrepaymentScheduleTest {
     fun aMidPeriodPrepaymentThatClearsTheDebtLeavesOnlyInterestDue() {
         // Cleared on 01.02, before the first payment date: there is no principal left
         // to pay on 15.02, but the 17 days the money was owed still earned interest.
-        //   17 дней на 1 000 000: 100000000 * 1200 * 17 / (10000 * 365) = 558 904,109 -> 558 904
+        //   17 дней на 1 000 000: 100000000 * 12000 * 17 / (100000 * 365) = 558 904,109 -> 558 904
         val schedule = generateSchedule(
             annuity(),
             prepayments = listOf(
@@ -234,7 +234,7 @@ class PrepaymentScheduleTest {
     fun prepaymentsAndRateChangesWorkTogether() {
         val schedule = generateSchedule(
             annuity(),
-            rateChanges = listOf(RateChange(LocalDate.of(2027, 5, 1), 1800)),
+            rateChanges = listOf(RateChange(LocalDate.of(2027, 5, 1), 18000)),
             prepayments = listOf(Prepayment(LocalDate.of(2027, 5, 20), 200_000_00, PrepaymentMode.REDUCE_PAYMENT)),
         )
 

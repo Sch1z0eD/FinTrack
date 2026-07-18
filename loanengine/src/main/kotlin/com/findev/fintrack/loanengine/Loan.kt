@@ -29,14 +29,18 @@ enum class LoanType {
  * the closing date - is computed from this plus its rate changes and prepayments,
  * and is never stored.
  *
- * Money is in kopecks. Rates are in basis points so no floating point is involved:
- * 1 bp = 0.01%, so 16.9% per year is 1690.
+ * Money is in kopecks. Rates are in thousandths of a percent so no floating point is
+ * involved: 1 unit = 0.001%, so 16.9% per year is 16900.
+ *
+ * Basis points (0.01%) were the original unit and were not enough. Real contracts quote
+ * three decimals - a Яндекс Банк loan at 28.572% is 2857.2 bp, which an Int cannot hold.
+ * Truncating it to 2857 cost 1.86 ₽ on that contract's final payment.
  */
 data class Loan(
     val type: LoanType,
     val principalMinor: Long,
     /** Rate at [startDate]; later changes live in the rate history. */
-    val annualRateBp: Int,
+    val annualRateMilliPercent: Int,
     val startDate: LocalDate,
     val termMonths: Int,
     /**
@@ -54,16 +58,43 @@ data class Loan(
      * usually earns: no interest, but a monthly servicing charge.
      */
     val monthlyFeeMinor: Long = 0,
+    /**
+     * Payment size taken from the contract instead of derived from the rate.
+     *
+     * Some contracts publish a level payment the annuity formula cannot reproduce. The
+     * case that forced this: a Яндекс Банк loan whose two rates are both fixed at signing
+     * (70% to 01.05.2026, then 28.572%), with one payment of 6696.00 solved across BOTH
+     * periods and held constant through the switch. Re-annuitising at the rate change -
+     * the right answer for a rate that moves unexpectedly - gives a different payment,
+     * and even the opening one is wrong: the formula says 7845.53, the contract says
+     * 6696.00.
+     *
+     * There is no reliable way to reverse-engineer how a given bank solved for its level
+     * payment, and the number is printed in the contract anyway. So when this is set the
+     * engine takes it as given and derives only the interest/principal split. A rate
+     * change then splits interest without resizing the payment.
+     *
+     * Prepayments still resize it: REDUCE_PAYMENT has to re-derive something, and the
+     * annuity formula is the only estimate available. That makes the post-prepayment tail
+     * an approximation of what the bank will send back - flagged here rather than hidden.
+     */
+    val fixedPaymentMinor: Long? = null,
 ) {
     init {
         require(principalMinor > 0) { "Principal must be positive, was $principalMinor" }
-        require(annualRateBp >= 0) { "Rate cannot be negative, was $annualRateBp" }
+        require(annualRateMilliPercent >= 0) { "Rate cannot be negative, was $annualRateMilliPercent" }
         require(termMonths > 0) { "Term must be positive, was $termMonths" }
         require(paymentDay in 1..31) { "Payment day must be 1..31, was $paymentDay" }
         require(upfrontFeeMinor >= 0) { "Upfront fee cannot be negative, was $upfrontFeeMinor" }
         require(monthlyFeeMinor >= 0) { "Monthly fee cannot be negative, was $monthlyFeeMinor" }
-        require(type != LoanType.INSTALLMENT || annualRateBp == 0) {
-            "An instalment plan carries no interest, rate was $annualRateBp"
+        require(type != LoanType.INSTALLMENT || annualRateMilliPercent == 0) {
+            "An instalment plan carries no interest, rate was $annualRateMilliPercent"
+        }
+        require(fixedPaymentMinor == null || fixedPaymentMinor > 0) {
+            "Contract payment must be positive, was $fixedPaymentMinor"
+        }
+        require(fixedPaymentMinor == null || type == LoanType.ANNUITY) {
+            "A contract payment only makes sense for a level-payment loan, type was $type"
         }
     }
 }

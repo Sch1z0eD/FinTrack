@@ -13,20 +13,20 @@ class RateChangeScheduleTest {
     private fun loan(
         type: LoanType = LoanType.ANNUITY,
         principalMinor: Long = 1_000_000_00,
-        annualRateBp: Int = 1200,
+        annualRateMilliPercent: Int = 12000,
         termMonths: Int = 12,
-    ) = Loan(type, principalMinor, annualRateBp, start, termMonths, paymentDay = 15)
+    ) = Loan(type, principalMinor, annualRateMilliPercent, start, termMonths, paymentDay = 15)
 
     @Test
     fun rateChangeMidPeriodSplitsThatPeriodsInterest() {
         // 15.01.2027 -> 15.02.2027 is 31 days, base 365. Rate rises to 15% on 01.02:
-        //   17 days at 12%: 100000000 * 1200 * 17 / (10000 * 365) =   558 904,109...
-        //   14 days at 15%: 100000000 * 1500 * 14 / (10000 * 365) =   575 342,465...
+        //   17 days at 12%: 100000000 * 12000 * 17 / (100000 * 365) =   558 904,109...
+        //   14 days at 15%: 100000000 * 15000 * 14 / (100000 * 365) =   575 342,465...
         //                                              total       = 1 134 246,575 -> 1 134 247
         val interest = exactInterestWithRateChanges(
             balanceMinor = 1_000_000_00,
-            baseRateBp = 1200,
-            sortedChanges = listOf(RateChange(LocalDate.of(2027, 2, 1), 1500)),
+            baseRateMilliPercent = 12000,
+            sortedChanges = listOf(RateChange(LocalDate.of(2027, 2, 1), 15000)),
             from = LocalDate.of(2027, 1, 15),
             to = LocalDate.of(2027, 2, 15),
         ).toKopecksHalfUp()
@@ -38,11 +38,11 @@ class RateChangeScheduleTest {
     fun splitInterestSitsBetweenBothFlatRates() {
         val from = LocalDate.of(2027, 1, 15)
         val to = LocalDate.of(2027, 2, 15)
-        val changes = listOf(RateChange(LocalDate.of(2027, 2, 1), 1500))
+        val changes = listOf(RateChange(LocalDate.of(2027, 2, 1), 15000))
 
-        val mixed = exactInterestWithRateChanges(1_000_000_00, 1200, changes, from, to).toKopecksHalfUp()
-        val allOld = exactInterest(1_000_000_00, 1200, from, to).toKopecksHalfUp()
-        val allNew = exactInterest(1_000_000_00, 1500, from, to).toKopecksHalfUp()
+        val mixed = exactInterestWithRateChanges(1_000_000_00, 12000, changes, from, to).toKopecksHalfUp()
+        val allOld = exactInterest(1_000_000_00, 12000, from, to).toKopecksHalfUp()
+        val allNew = exactInterest(1_000_000_00, 15000, from, to).toKopecksHalfUp()
 
         // Proves the period really was split rather than one rate winning outright.
         assertTrue(mixed > allOld)
@@ -60,7 +60,7 @@ class RateChangeScheduleTest {
     @Test
     fun annuityPaymentIsResizedFromTheNextPaymentAfterTheChange() {
         // Change lands mid-period (01.02), between payment 1 (15.02) and its period start.
-        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 2, 1), 1500)))
+        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 2, 1), 15000)))
 
         // Payment 1's period began on 15.01 at the old rate, so its size is unchanged...
         assertEquals(88_848_79L, schedule[0].paymentMinor)
@@ -77,7 +77,7 @@ class RateChangeScheduleTest {
     @Test
     fun rateRiseCostsMoreInterestOverall() {
         val flat = generateSchedule(loan()).sumOf { it.interestMinor }
-        val rising = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 2000)))
+        val rising = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 20000)))
             .sumOf { it.interestMinor }
 
         assertTrue("rising=$rising should cost more than flat=$flat", rising > flat)
@@ -86,7 +86,7 @@ class RateChangeScheduleTest {
     @Test
     fun rateCutSavesInterest() {
         val flat = generateSchedule(loan()).sumOf { it.interestMinor }
-        val falling = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 600)))
+        val falling = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 6000)))
             .sumOf { it.interestMinor }
 
         assertTrue("falling=$falling should cost less than flat=$flat", falling < flat)
@@ -94,7 +94,7 @@ class RateChangeScheduleTest {
 
     @Test
     fun theLoanStillReconcilesAfterAChange() {
-        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 2000)))
+        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2027, 7, 15), 20000)))
 
         assertEquals(1_000_000_00L, schedule.sumOf { it.principalMinor })
         assertEquals(0L, schedule.last().balanceAfterMinor)
@@ -108,8 +108,8 @@ class RateChangeScheduleTest {
         val schedule = generateSchedule(
             loan(),
             listOf(
-                RateChange(LocalDate.of(2027, 4, 15), 1800),
-                RateChange(LocalDate.of(2027, 8, 15), 900),
+                RateChange(LocalDate.of(2027, 4, 15), 18000),
+                RateChange(LocalDate.of(2027, 8, 15), 9000),
             ),
         )
 
@@ -122,17 +122,17 @@ class RateChangeScheduleTest {
 
     @Test
     fun changesOutsideTheTermDoNothing() {
-        val afterTheEnd = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2030, 1, 1), 3000)))
+        val afterTheEnd = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2030, 1, 1), 30000)))
 
         assertEquals(generateSchedule(loan()), afterTheEnd)
     }
 
     @Test
     fun aChangeDatedBeforeTheStartActsAsTheOpeningRate() {
-        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2026, 1, 1), 600)))
+        val schedule = generateSchedule(loan(), listOf(RateChange(LocalDate.of(2026, 1, 1), 6000)))
 
         // The whole loan runs at 6%: same as if it had been written that way.
-        assertEquals(generateSchedule(loan(annualRateBp = 600)), schedule)
+        assertEquals(generateSchedule(loan(annualRateMilliPercent = 6000)), schedule)
     }
 
     @Test
@@ -140,7 +140,7 @@ class RateChangeScheduleTest {
         val flat = generateSchedule(loan(type = LoanType.DIFFERENTIATED))
         val changed = generateSchedule(
             loan(type = LoanType.DIFFERENTIATED),
-            listOf(RateChange(LocalDate.of(2027, 7, 15), 2000)),
+            listOf(RateChange(LocalDate.of(2027, 7, 15), 20000)),
         )
 
         // Principal slices are fixed by the term, so nothing about them may move...
@@ -155,7 +155,7 @@ class RateChangeScheduleTest {
         val instalment = Loan(LoanType.INSTALLMENT, 60_000_00, 0, start, 6, 15)
 
         try {
-            generateSchedule(instalment, listOf(RateChange(LocalDate.of(2027, 3, 1), 1000)))
+            generateSchedule(instalment, listOf(RateChange(LocalDate.of(2027, 3, 1), 10000)))
             throw AssertionError("Expected IllegalArgumentException")
         } catch (_: IllegalArgumentException) {
             // A 0% plan with a rate change is a contradiction, not a schedule.
@@ -165,14 +165,14 @@ class RateChangeScheduleTest {
     @Test
     fun rateOnPicksTheLatestChangeInForce() {
         val changes = listOf(
-            RateChange(LocalDate.of(2027, 4, 15), 1800),
-            RateChange(LocalDate.of(2027, 8, 15), 900),
+            RateChange(LocalDate.of(2027, 4, 15), 18000),
+            RateChange(LocalDate.of(2027, 8, 15), 9000),
         )
 
-        assertEquals(1200, rateOn(1200, changes, LocalDate.of(2027, 4, 14)))
+        assertEquals(12000, rateOn(12000, changes, LocalDate.of(2027, 4, 14)))
         // Effective from is inclusive: the change bites on its own date.
-        assertEquals(1800, rateOn(1200, changes, LocalDate.of(2027, 4, 15)))
-        assertEquals(1800, rateOn(1200, changes, LocalDate.of(2027, 8, 14)))
-        assertEquals(900, rateOn(1200, changes, LocalDate.of(2027, 8, 15)))
+        assertEquals(18000, rateOn(12000, changes, LocalDate.of(2027, 4, 15)))
+        assertEquals(18000, rateOn(12000, changes, LocalDate.of(2027, 8, 14)))
+        assertEquals(9000, rateOn(12000, changes, LocalDate.of(2027, 8, 15)))
     }
 }

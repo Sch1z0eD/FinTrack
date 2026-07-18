@@ -10,11 +10,11 @@ class AnnuityScheduleTest {
 
     private fun loan(
         principalMinor: Long = 1_000_000_00,
-        annualRateBp: Int = 1690,
+        annualRateMilliPercent: Int = 16900,
         termMonths: Int = 60,
         startDate: LocalDate = LocalDate.of(2026, 1, 15),
         paymentDay: Int = 15,
-    ) = Loan(LoanType.ANNUITY, principalMinor, annualRateBp, startDate, termMonths, paymentDay)
+    ) = Loan(LoanType.ANNUITY, principalMinor, annualRateMilliPercent, startDate, termMonths, paymentDay)
 
     @Test
     fun everyRowSplitsExactlyIntoInterestAndPrincipal() {
@@ -68,7 +68,7 @@ class AnnuityScheduleTest {
 
     @Test
     fun zeroRateLoanIsPurePrincipal() {
-        val schedule = generateSchedule(loan(principalMinor = 120_000_00, annualRateBp = 0, termMonths = 12))
+        val schedule = generateSchedule(loan(principalMinor = 120_000_00, annualRateMilliPercent = 0, termMonths = 12))
 
         assertEquals(12, schedule.size)
         assertTrue(schedule.all { it.interestMinor == 0L })
@@ -82,10 +82,10 @@ class AnnuityScheduleTest {
         // 15.01 -> 15.02 is 31 days, so the first interest must match those 31 days
         // rather than a "monthly" twelfth.
         val schedule = generateSchedule(
-            loan(principalMinor = 1_000_000_00, annualRateBp = 1200, startDate = LocalDate.of(2026, 1, 15)),
+            loan(principalMinor = 1_000_000_00, annualRateMilliPercent = 12000, startDate = LocalDate.of(2026, 1, 15)),
         )
 
-        // 100000000 * 1200 * 31 / (10000 * 365) = 1 019 178,08 -> 1 019 178
+        // 100000000 * 12000 * 31 / (100000 * 365) = 1 019 178,08 -> 1 019 178
         assertEquals(1_019_178L, schedule.first().interestMinor)
         assertEquals(LocalDate.of(2026, 2, 15), schedule.first().date)
     }
@@ -119,7 +119,7 @@ class AnnuityScheduleTest {
     @Test
     fun longMortgageStillReconcilesToTheKopeck() {
         // 20 years crosses five leap years; drift would show up here if anywhere.
-        val schedule = generateSchedule(loan(principalMinor = 5_000_000_00, annualRateBp = 1150, termMonths = 240))
+        val schedule = generateSchedule(loan(principalMinor = 5_000_000_00, annualRateMilliPercent = 11500, termMonths = 240))
 
         assertEquals(240, schedule.size)
         assertEquals(5_000_000_00L, schedule.sumOf { it.principalMinor })

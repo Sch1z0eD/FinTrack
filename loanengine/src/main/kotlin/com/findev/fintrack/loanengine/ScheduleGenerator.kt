@@ -125,7 +125,7 @@ private fun accruePeriod(
 
     for (prepayment in periodPrepayments) {
         accrued = accrued.add(
-            exactInterestWithRateChanges(balance, loan.annualRateBp, sortedChanges, cursor, prepayment.date),
+            exactInterestWithRateChanges(balance, loan.annualRateMilliPercent, sortedChanges, cursor, prepayment.date),
         )
         // Never overpay: the debt is the ceiling.
         val applied = minOf(prepayment.amountMinor, balance)
@@ -135,7 +135,7 @@ private fun accruePeriod(
     }
 
     accrued = accrued.add(
-        exactInterestWithRateChanges(balance, loan.annualRateBp, sortedChanges, cursor, to),
+        exactInterestWithRateChanges(balance, loan.annualRateMilliPercent, sortedChanges, cursor, to),
     )
     return Accrual(accrued.toKopecksHalfUp(), balance, prepaid)
 }
@@ -231,8 +231,10 @@ private fun annuitySchedule(
     var periodStart = loan.startDate
     // Size the opening payment from the rate actually in force on the start date, not
     // from the loan's written rate: a change dated on or before the start supersedes it.
-    var rateInPayment = rateOn(loan.annualRateBp, sortedChanges, loan.startDate)
-    var payment = annuityPaymentMinor(loan.principalMinor, rateInPayment, loan.termMonths)
+    var rateInPayment = rateOn(loan.annualRateMilliPercent, sortedChanges, loan.startDate)
+    // A contract payment overrides the formula outright - see Loan.fixedPaymentMinor.
+    var payment = loan.fixedPaymentMinor
+        ?: annuityPaymentMinor(loan.principalMinor, rateInPayment, loan.termMonths)
 
     for (number in 1..loan.termMonths) {
         val date = paymentDate(loan.startDate, loan.paymentDay, number)
@@ -241,9 +243,16 @@ private fun annuitySchedule(
         // schedule: the new payment is derived from what is still owed over what is left
         // of the term. A change landing mid-period only splits this period's interest;
         // the resized payment starts from the next one, as banks do it.
-        val rateNow = rateOn(loan.annualRateBp, sortedChanges, periodStart)
+        //
+        // Unless the contract fixed the payment: then both rates were known at signing
+        // and the published payment already spans them, so it must not be resized here -
+        // only the interest split moves. Tracking rateInPayment still matters, because a
+        // later REDUCE_PAYMENT prepayment re-derives from the rate in force.
+        val rateNow = rateOn(loan.annualRateMilliPercent, sortedChanges, periodStart)
         if (rateNow != rateInPayment) {
-            payment = annuityPaymentMinor(balance, rateNow, loan.termMonths - number + 1)
+            if (loan.fixedPaymentMinor == null) {
+                payment = annuityPaymentMinor(balance, rateNow, loan.termMonths - number + 1)
+            }
             rateInPayment = rateNow
         }
 

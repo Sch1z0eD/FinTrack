@@ -17,7 +17,8 @@ import java.time.temporal.ChronoUnit
 /** Wide enough that powers and divisions never lose a kopeck before the final rounding. */
 internal val MATH: MathContext = MathContext(30, RoundingMode.HALF_UP)
 
-private val BASIS_POINTS: BigDecimal = BigDecimal(10_000)
+/** Rates are thousandths of a percent, so 100% is 100 000 units. See [Loan.annualRateMilliPercent]. */
+private val PERCENT_UNITS: BigDecimal = BigDecimal(100_000)
 private val MONTHS_PER_YEAR: BigDecimal = BigDecimal(12)
 
 internal fun daysInYear(year: Int): Int = if (Year.isLeap(year.toLong())) 366 else 365
@@ -37,12 +38,12 @@ internal fun BigDecimal.toKopecksHalfUp(): Long = setScale(0, RoundingMode.HALF_
  */
 internal fun exactInterest(
     balanceMinor: Long,
-    rateBp: Int,
+    rateMilliPercent: Int,
     from: LocalDate,
     to: LocalDate,
 ): BigDecimal {
     require(!to.isBefore(from)) { "Period ends $to before it starts $from" }
-    if (balanceMinor == 0L || rateBp == 0) return BigDecimal.ZERO
+    if (balanceMinor == 0L || rateMilliPercent == 0) return BigDecimal.ZERO
 
     var accrued = BigDecimal.ZERO
     var cursor = from
@@ -53,18 +54,18 @@ internal fun exactInterest(
 
         accrued = accrued.add(
             BigDecimal(balanceMinor)
-                .multiply(BigDecimal(rateBp))
+                .multiply(BigDecimal(rateMilliPercent))
                 .multiply(BigDecimal(days))
-                .divide(BASIS_POINTS.multiply(BigDecimal(daysInYear(cursor.year))), MATH),
+                .divide(PERCENT_UNITS.multiply(BigDecimal(daysInYear(cursor.year))), MATH),
         )
         cursor = segmentEnd
     }
     return accrued
 }
 
-/** Rate in force on [date]: the latest change that has taken effect, else [baseRateBp]. */
-internal fun rateOn(baseRateBp: Int, sortedChanges: List<RateChange>, date: LocalDate): Int =
-    sortedChanges.lastOrNull { !it.effectiveFrom.isAfter(date) }?.annualRateBp ?: baseRateBp
+/** Rate in force on [date]: the latest change that has taken effect, else [baseRateMilliPercent]. */
+internal fun rateOn(baseRateMilliPercent: Int, sortedChanges: List<RateChange>, date: LocalDate): Int =
+    sortedChanges.lastOrNull { !it.effectiveFrom.isAfter(date) }?.annualRateMilliPercent ?: baseRateMilliPercent
 
 /**
  * Exact, unrounded interest for [from] until [to], honouring rate changes inside the
@@ -76,7 +77,7 @@ internal fun rateOn(baseRateBp: Int, sortedChanges: List<RateChange>, date: Loca
  */
 internal fun exactInterestWithRateChanges(
     balanceMinor: Long,
-    baseRateBp: Int,
+    baseRateMilliPercent: Int,
     sortedChanges: List<RateChange>,
     from: LocalDate,
     to: LocalDate,
@@ -92,7 +93,7 @@ internal fun exactInterestWithRateChanges(
         val segmentEnd = nextChange ?: to
 
         accrued = accrued.add(
-            exactInterest(balanceMinor, rateOn(baseRateBp, sortedChanges, cursor), cursor, segmentEnd),
+            exactInterest(balanceMinor, rateOn(baseRateMilliPercent, sortedChanges, cursor), cursor, segmentEnd),
         )
         cursor = segmentEnd
     }
@@ -115,12 +116,12 @@ internal fun paymentDate(start: LocalDate, paymentDay: Int, number: Int): LocalD
  * actual days ([exactInterest]), which is exactly why the final payment comes out
  * different from the rest - banks work the same way.
  */
-internal fun annuityPaymentMinor(principalMinor: Long, annualRateBp: Int, termMonths: Int): Long {
-    if (annualRateBp == 0) {
+internal fun annuityPaymentMinor(principalMinor: Long, annualRateMilliPercent: Int, termMonths: Int): Long {
+    if (annualRateMilliPercent == 0) {
         return BigDecimal(principalMinor).divide(BigDecimal(termMonths), MATH).toKopecksHalfUp()
     }
 
-    val monthlyRate = BigDecimal(annualRateBp).divide(BASIS_POINTS.multiply(MONTHS_PER_YEAR), MATH)
+    val monthlyRate = BigDecimal(annualRateMilliPercent).divide(PERCENT_UNITS.multiply(MONTHS_PER_YEAR), MATH)
     val growth = BigDecimal.ONE.add(monthlyRate).pow(termMonths, MATH)
 
     return BigDecimal(principalMinor)

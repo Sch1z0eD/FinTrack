@@ -12,7 +12,7 @@ import java.time.LocalDate
  *
  * The worked loan is 12 000 руб. at 12% over 6 months from 15.01.2027, differentiated:
  * the principal slice is exactly 2 000 руб. a month, so every period is
- * balance x 1200 x days / (10000 x 365) rounded HALF_UP and can be checked on paper.
+ * balance x 12000 x days / (100000 x 365) rounded HALF_UP and can be checked on paper.
  * 2027 is not a leap year, so the divisor is 365 throughout.
  *
  * Left alone, its interest per period is:
@@ -30,10 +30,10 @@ class PrepaymentSimulatorTest {
 
     /** The loan worked through in the class comment. */
     private fun differentiated() =
-        Loan(LoanType.DIFFERENTIATED, 12_000_00, 1200, start, 6, paymentDay = 15)
+        Loan(LoanType.DIFFERENTIATED, 12_000_00, 12000, start, 6, paymentDay = 15)
 
     private fun annuity() =
-        Loan(LoanType.ANNUITY, 1_000_000_00, 1200, start, 12, paymentDay = 15)
+        Loan(LoanType.ANNUITY, 1_000_000_00, 12000, start, 12, paymentDay = 15)
 
     /** The first payment date, so the prepayment lands after the scheduled payment. */
     private val prepayDate = LocalDate.of(2027, 2, 15)
@@ -130,7 +130,7 @@ class PrepaymentSimulatorTest {
             amountMinor = 100_000_00,
         )
 
-        val untouched = annuityPaymentMinor(1_000_000_00, 1200, 12)
+        val untouched = annuityPaymentMinor(1_000_000_00, 12000, 12)
         assertEquals(untouched, simulation.reduceTerm.paymentAfterMinor)
         assertTrue(
             "the payment should shrink, was ${simulation.reducePayment.paymentAfterMinor}",
@@ -196,7 +196,7 @@ class PrepaymentSimulatorTest {
         val skewed = Loan(
             LoanType.ANNUITY,
             1_000_000_00,
-            1200,
+            12000,
             LocalDate.of(2026, 7, 17),
             12,
             paymentDay = 15,
@@ -220,7 +220,7 @@ class PrepaymentSimulatorTest {
         val skewed = Loan(
             LoanType.ANNUITY,
             1_000_000_00,
-            1200,
+            12000,
             LocalDate.of(2026, 7, 17),
             12,
             paymentDay = 15,

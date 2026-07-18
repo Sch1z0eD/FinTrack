@@ -11,16 +11,16 @@ class LoanModelsTest {
     private fun loan(
         type: LoanType = LoanType.ANNUITY,
         principalMinor: Long = 1_000_000_00,
-        annualRateBp: Int = 1690,
+        annualRateMilliPercent: Int = 16900,
         termMonths: Int = 60,
         paymentDay: Int = 15,
-    ) = Loan(type, principalMinor, annualRateBp, start, termMonths, paymentDay)
+    ) = Loan(type, principalMinor, annualRateMilliPercent, start, termMonths, paymentDay)
 
     @Test
     fun loanRejectsNonsenseInput() {
         assertThrows(IllegalArgumentException::class.java) { loan(principalMinor = 0) }
         assertThrows(IllegalArgumentException::class.java) { loan(principalMinor = -1) }
-        assertThrows(IllegalArgumentException::class.java) { loan(annualRateBp = -1) }
+        assertThrows(IllegalArgumentException::class.java) { loan(annualRateMilliPercent = -1) }
         assertThrows(IllegalArgumentException::class.java) { loan(termMonths = 0) }
         assertThrows(IllegalArgumentException::class.java) { loan(paymentDay = 0) }
         assertThrows(IllegalArgumentException::class.java) { loan(paymentDay = 32) }
@@ -30,14 +30,14 @@ class LoanModelsTest {
     fun instalmentPlanCannotCarryInterest() {
         // The whole point of рассрочка is 0%: the cost sits in fees, not a rate.
         assertThrows(IllegalArgumentException::class.java) {
-            loan(type = LoanType.INSTALLMENT, annualRateBp = 1)
+            loan(type = LoanType.INSTALLMENT, annualRateMilliPercent = 10)
         }
-        loan(type = LoanType.INSTALLMENT, annualRateBp = 0)
+        loan(type = LoanType.INSTALLMENT, annualRateMilliPercent = 0)
     }
 
     @Test
     fun zeroRateIsValidForARealLoan() {
-        loan(annualRateBp = 0)
+        loan(annualRateMilliPercent = 0)
     }
 
     @Test
@@ -97,10 +97,10 @@ class LoanModelsTest {
     @Test
     fun feesCannotBeNegative() {
         assertThrows(IllegalArgumentException::class.java) {
-            Loan(LoanType.ANNUITY, 1_000_00, 1000, start, 12, 15, upfrontFeeMinor = -1)
+            Loan(LoanType.ANNUITY, 1_000_00, 10000, start, 12, 15, upfrontFeeMinor = -1)
         }
         assertThrows(IllegalArgumentException::class.java) {
-            Loan(LoanType.ANNUITY, 1_000_00, 1000, start, 12, 15, monthlyFeeMinor = -1)
+            Loan(LoanType.ANNUITY, 1_000_00, 10000, start, 12, 15, monthlyFeeMinor = -1)
         }
     }
 
