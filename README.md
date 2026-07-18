@@ -14,6 +14,23 @@
   периода, округление HALF_UP на каждом платеже. Формулы сверены с реальным договором
   до копейки.
 
+## Как выглядит
+
+| Обзор | Операции | Платежи |
+|---|---|---|
+| ![Обзор](docs/screenshots/01-overview.png) | ![Операции](docs/screenshots/02-transactions.png) | ![Платежи](docs/screenshots/03-payments.png) |
+
+| Кредит | ЖКХ | Статистика |
+|---|---|---|
+| ![Кредит](docs/screenshots/05-loan-detail.png) | ![ЖКХ](docs/screenshots/04-utilities.png) | ![Статистика](docs/screenshots/06-statistics.png) |
+
+| Ввод операции | Регулярный платёж | Настройки |
+|---|---|---|
+| ![Ввод](docs/screenshots/08-quick-entry.png) | ![Платёж](docs/screenshots/09-recurring-detail.png) | ![Настройки](docs/screenshots/07-settings.png) |
+
+Данные на скриншотах демонстрационные. Подробнее — в
+[docs/screenshots](docs/screenshots/README.md).
+
 ## Возможности
 
 **Операции.** Быстрый ввод в три касания, категории с иконками, свайп для правки и
