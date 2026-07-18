@@ -24,6 +24,8 @@ fun ChipRow(
     selectedId: String?,
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Drawn before the chips, inside the same scrolling row. */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -32,6 +34,7 @@ fun ChipRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leading?.invoke()
         items.forEach { (id, label) ->
             FilterChip(
                 selected = id == selectedId,

@@ -23,7 +23,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -32,9 +31,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -42,11 +45,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.data.local.dao.SettlementRow
 import com.findev.fintrack.data.local.entity.LoanPrepaymentEntity
 import com.findev.fintrack.data.local.entity.LoanType
 import com.findev.fintrack.data.local.entity.PrepaymentMode
 import com.findev.fintrack.loanengine.LoanSummary
 import com.findev.fintrack.loanengine.ScheduleEntry
+import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.ui.formatMinor
 import com.findev.fintrack.ui.screens.payments.PAID_GREEN
 import com.findev.fintrack.ui.screens.payments.PayDialog
@@ -58,6 +63,8 @@ import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProdu
 import com.patrykandpatrick.vico.compose.cartesian.data.lineSeries
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoScrollState
+import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import java.time.LocalDate
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +76,7 @@ fun LoanDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val payDialog by viewModel.payDialog.collectAsStateWithLifecycle()
+    var showPaid by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
         viewModel.onRefresh()
@@ -146,21 +154,60 @@ fun LoanDetailScreen(
                 )
             }
 
+            item(key = "history") {
+                // What was actually paid, which the schedule cannot show: it lists what is
+                // owed, not what left the account, and the two differ the moment a payment
+                // is late, short, or settled for less.
+                PaymentHistoryCard(settlements = state.settlements)
+            }
+
             item(key = "chart") {
                 BalanceChartCard(schedule = state.schedule)
             }
 
-            item(key = "schedule-header") {
-                Text(
-                    text = stringResource(R.string.loan_detail_schedule),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
+            // Everything before the next payment is history. On a 24-month loan that is a
+            // nuisance to scroll past; on a mortgage it is hundreds of rows between the user
+            // and the only line they opened the screen to see.
+            val nextNumber = state.nextPayment?.number
+            val paidCount = state.schedule.count { nextNumber != null && it.number < nextNumber }
+            val visible = if (showPaid || nextNumber == null) {
+                state.schedule
+            } else {
+                state.schedule.filter { it.number >= nextNumber }
             }
 
-            items(state.schedule, key = { it.number }) { entry ->
-                ScheduleRow(entry)
+            item(key = "schedule-header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.loan_detail_schedule),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (paidCount > 0) {
+                        TextButton(onClick = { showPaid = !showPaid }) {
+                            Text(
+                                stringResource(
+                                    if (showPaid) {
+                                        R.string.loan_schedule_hide_paid
+                                    } else {
+                                        R.string.loan_schedule_show_paid
+                                    },
+                                    paidCount,
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(visible, key = { it.number }) { entry ->
+                ScheduleRow(entry, isNext = entry.number == nextNumber)
                 HorizontalDivider()
             }
         }
@@ -181,6 +228,7 @@ fun LoanDetailScreen(
         PayDialog(
             state = dialog,
             onAmountChange = viewModel::onPayAmountChange,
+            onPartialChange = viewModel::onPayPartialChange,
             onDateChange = viewModel::onPayDateChange,
             onConfirm = viewModel::onPayConfirm,
             onDismiss = viewModel::onPayDismiss,
@@ -338,7 +386,7 @@ private fun SummaryCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                LinearProgressIndicator(
+                FinTrackProgress(
                     // Float drives the bar only; the kopecks behind it stay Long.
                     progress = {
                         if (summary.principalMinor == 0L) 1f
@@ -448,6 +496,85 @@ private fun SummaryRow(
     }
 }
 
+/** Everything ever paid against this loan, newest first. */
+@Composable
+private fun PaymentHistoryCard(settlements: List<SettlementRow>) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = stringResource(R.string.payment_history_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = stringResource(
+                        R.string.money_with_currency,
+                        formatMinor(settlements.sumOf { it.amountMinor }),
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+
+            if (settlements.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.payment_history_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@Column
+            }
+
+            settlements.forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = shortDate(LocalDate.ofEpochDay(row.dateEpochDay)),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.payment_history_for,
+                                shortDate(LocalDate.ofEpochDay(row.dueEpochDay)),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = stringResource(
+                                R.string.money_with_currency,
+                                formatMinor(row.amountMinor),
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        if (row.isPartial) {
+                            Text(
+                                text = stringResource(R.string.payment_partial),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun BalanceChartCard(schedule: List<ScheduleEntry>) {
     val modelProducer = remember { CartesianChartModelProducer() }
@@ -482,6 +609,12 @@ private fun BalanceChartCard(schedule: List<ScheduleEntry>) {
                     bottomAxis = HorizontalAxis.rememberBottom(),
                 ),
                 modelProducer = modelProducer,
+                // The whole term, not the first few months. By default the chart keeps its
+                // own zoom and scrolls sideways, so a 24-payment loan showed nine points and
+                // a line that stopped in mid-air - it read as broken data rather than as a
+                // chart the user was expected to drag.
+                scrollState = rememberVicoScrollState(scrollEnabled = false),
+                zoomState = rememberVicoZoomState(zoomEnabled = false),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp),
@@ -491,11 +624,16 @@ private fun BalanceChartCard(schedule: List<ScheduleEntry>) {
 }
 
 @Composable
-private fun ScheduleRow(entry: ScheduleEntry) {
+private fun ScheduleRow(entry: ScheduleEntry, isNext: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            // The row the screen was opened for gets a tint rather than a badge: it is
+            // already first in the list, it only needs to be findable after scrolling.
+            .background(
+                if (isNext) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            )
+            .padding(vertical = 8.dp, horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(

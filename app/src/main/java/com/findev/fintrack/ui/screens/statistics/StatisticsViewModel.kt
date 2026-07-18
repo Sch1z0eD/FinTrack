@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.findev.fintrack.data.AccountRepository
 import com.findev.fintrack.data.MonthlyBar
+import com.findev.fintrack.data.PeriodSelection
 import com.findev.fintrack.data.StatPeriod
 import com.findev.fintrack.data.TransactionRepository
 import com.findev.fintrack.data.buildMonthlyBars
@@ -13,6 +14,7 @@ import com.findev.fintrack.data.range
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -36,7 +38,7 @@ data class AccountOption(val id: String, val name: String)
 data class CategoryRef(val id: String, val name: String, val icon: String, val color: Long)
 
 data class StatisticsUiState(
-    val period: StatPeriod = StatPeriod.THIS_MONTH,
+    val selection: PeriodSelection = PeriodSelection(),
     val slices: List<CategorySlice> = emptyList(),
     val totalMinor: Long = 0,
     /** Last months' bars: income+expense in overview, one category's expense when [selectedCategory] is set. */
@@ -56,7 +58,7 @@ class StatisticsViewModel @Inject constructor(
     accountRepository: AccountRepository,
 ) : ViewModel() {
 
-    private val period = MutableStateFlow(StatPeriod.THIS_MONTH)
+    private val period = MutableStateFlow(PeriodSelection())
     private val selectedAccountId = MutableStateFlow<String?>(null)
     private val selectedCategory = MutableStateFlow<CategoryRef?>(null)
 
@@ -66,7 +68,11 @@ class StatisticsViewModel @Inject constructor(
 
     private val categorySlices = combine(period, selectedAccountId) { p, acc -> p to acc }
         .flatMapLatest { (p, acc) ->
-            val (from, to) = p.range(LocalDate.now())
+            // "Всё время" has no bounds; the widest range SQLite can compare stands in
+            // for it so the query itself does not need a second shape.
+            // "Всё время", and a half-filled custom range, mean "do not limit": the widest
+            // range SQLite can compare stands in so the query keeps one shape.
+            val (from, to) = p.bounds(LocalDate.now()) ?: (Long.MIN_VALUE to Long.MAX_VALUE)
             transactionRepository.observeExpensesByCategory(from, to, acc).map { categories ->
                 val total = categories.sumOf { it.totalMinor }
                 val slices = categories.map {
@@ -97,7 +103,7 @@ class StatisticsViewModel @Inject constructor(
         selectedCategory,
     ) { (p, slices, total), months, accountList, accountId, category ->
         StatisticsUiState(
-            period = p,
+            selection = p,
             slices = slices,
             totalMinor = total,
             months = months,
@@ -113,7 +119,11 @@ class StatisticsViewModel @Inject constructor(
     )
 
     fun onPeriodChange(newPeriod: StatPeriod) {
-        period.value = newPeriod
+        period.update { it.copy(period = newPeriod) }
+    }
+
+    fun onCustomRangeChange(fromEpochDay: Long?, toEpochDay: Long?) {
+        period.value = PeriodSelection(StatPeriod.CUSTOM, fromEpochDay, toEpochDay)
     }
 
     fun onAccountChange(accountId: String?) {

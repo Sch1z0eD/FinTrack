@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -29,6 +30,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -43,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -53,11 +56,19 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.UndoSnackbarHost
+import com.findev.fintrack.ui.showUndo
+import com.findev.fintrack.data.StatPeriod
 import com.findev.fintrack.data.local.TransactionListItem
 import com.findev.fintrack.data.local.entity.TransactionType
+import com.findev.fintrack.ui.PeriodFilterBar
+import com.findev.fintrack.ui.RowCorner
+import com.findev.fintrack.ui.FilterDropdown
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.floatingBottomBarSpace
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.theme.MoneyColors
+import com.findev.fintrack.ui.screens.statistics.labelRes
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -87,7 +98,7 @@ fun TransactionsScreen(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0),
         snackbarHost = {
-            SnackbarHost(snackbarHostState, Modifier.padding(bottom = barSpace))
+            UndoSnackbarHost(snackbarHostState, bottomPadding = barSpace)
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -101,13 +112,37 @@ fun TransactionsScreen(
             }
         },
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            // Outside the LazyColumn on purpose: a filter that scrolls away leaves no way
+            // to tell a quiet month from a short list without scrolling back up.
+            PeriodFilterBar(
+                selection = state.selection,
+                onPeriodChange = viewModel::onPeriodChange,
+                onCustomRangeChange = viewModel::onCustomRangeChange,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                leading = {
+                    // Same line as the period control: two stacked filter rows ate the top
+                    // of a screen that exists to show the list below them.
+                    val options = listOf(
+                        TypeFilter.ALL to stringResource(R.string.filter_all),
+                        TypeFilter.EXPENSE to stringResource(R.string.filter_expense),
+                        TypeFilter.INCOME to stringResource(R.string.filter_income),
+                    )
+                    FilterDropdown(
+                        label = options.first { it.first == state.typeFilter }.second,
+                        options = options,
+                        selected = state.typeFilter,
+                        onSelected = viewModel::onTypeFilterChange,
+                    )
+                },
+            )
+
             if (state.isEmpty) {
-                EmptyFeed()
+                EmptyFeed(filtered = state.isFilteredEmpty, modifier = Modifier.weight(1f))
             } else {
                 TransactionFeed(
                     state = state,
@@ -117,11 +152,7 @@ fun TransactionsScreen(
                     onDelete = { id ->
                         viewModel.onDelete(id)
                         scope.launch {
-                            val result = snackbarHostState.showSnackbar(
-                                message = deletedMessage,
-                                actionLabel = undoLabel,
-                            )
-                            if (result == SnackbarResult.ActionPerformed) {
+                            if (snackbarHostState.showUndo(deletedMessage, undoLabel)) {
                                 viewModel.onUndoDelete(id)
                             }
                         }
@@ -137,18 +168,28 @@ fun TransactionsScreen(
 }
 
 @Composable
-private fun EmptyFeed() {
+private fun EmptyFeed(filtered: Boolean, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = stringResource(R.string.transactions_empty),
+            text = stringResource(
+                if (filtered) R.string.transactions_empty_period else R.string.transactions_empty,
+            ),
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = stringResource(R.string.transactions_empty_hint),
+            // Telling someone to add their first transaction when they have hundreds and
+            // merely picked a quiet week is the kind of thing that makes an app feel dumb.
+            text = stringResource(
+                if (filtered) {
+                    R.string.transactions_empty_period_hint
+                } else {
+                    R.string.transactions_empty_hint
+                },
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -166,7 +207,12 @@ private fun TransactionFeed(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         // 88dp clears the FAB, which now also sits above the floating bar.
-        contentPadding = PaddingValues(bottom = 88.dp + bottomPadding),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            bottom = 88.dp + bottomPadding,
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         state.groups.forEach { group ->
             item(key = "header-${group.dateEpochDay}") {
@@ -174,7 +220,7 @@ private fun TransactionFeed(
                     text = dateLabel(group.dateEpochDay),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
                 )
             }
             items(group.items, key = { it.id }) { item ->
@@ -183,6 +229,8 @@ private fun TransactionFeed(
                     onClick = { onView(item) },
                     onEdit = { onEdit(item.id) },
                     onDelete = { onDelete(item.id) },
+                    // Deleting removes a row mid-list; let the rest slide up.
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -203,6 +251,7 @@ private fun SwipeableTransactionRow(
     onClick: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
     val actionsWidthPx = with(LocalDensity.current) { (ACTION_WIDTH * 2).toPx() }
@@ -227,7 +276,13 @@ private fun SwipeableTransactionRow(
         offsetX = (offsetX + delta).coerceIn(-actionsWidthPx, 0f)
     }
 
-    Box(modifier = Modifier.fillMaxWidth()) {
+    // Clipping the whole stack keeps the swipe actions inside the card's rounded outline
+    // instead of squaring off its corners as they are revealed.
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(RowCorner)),
+    ) {
         // matchParentSize: the actions take their height from the row, never define it.
         Row(
             modifier = Modifier.matchParentSize(),
@@ -310,10 +365,11 @@ private fun TransactionRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Opaque on purpose: it slides over the actions and must hide them.
-            .background(MaterialTheme.colorScheme.surface)
+            // Fully opaque on purpose: it slides over the actions and must hide them, so
+            // this one surface cannot join the translucent glass the rest of the app uses.
+            .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -338,10 +394,21 @@ private fun TransactionRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val subtitle = item.note?.takeIf { it.isNotBlank() } ?: item.accountName
             Text(
-                text = item.note?.takeIf { it.isNotBlank() } ?: item.accountName,
+                // A part payment looks exactly like any other expense in a list, which is
+                // how an obligation can sit half-paid without anything saying so.
+                text = if (item.isPartialSettlement) {
+                    stringResource(R.string.transactions_partial_suffix, subtitle)
+                } else {
+                    subtitle
+                },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (item.isPartialSettlement) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -350,10 +417,10 @@ private fun TransactionRow(
         Text(
             text = stringResource(R.string.money_with_currency, signedAmount(item)),
             style = MaterialTheme.typography.titleMedium,
-            color = if (item.type == TransactionType.INCOME) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurface
+            color = when (item.type) {
+                TransactionType.INCOME -> MoneyColors.income
+                TransactionType.EXPENSE -> MoneyColors.expense
+                TransactionType.TRANSFER -> MaterialTheme.colorScheme.onSurface
             },
         )
     }

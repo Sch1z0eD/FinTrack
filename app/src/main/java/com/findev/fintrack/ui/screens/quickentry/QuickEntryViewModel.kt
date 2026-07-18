@@ -40,6 +40,8 @@ data class QuickEntryUiState(
     val selectedAccountId: String? = null,
     val categories: List<CategoryEntity> = emptyList(),
     val selectedCategoryId: String? = null,
+    /** Destination of a transfer; unused by income and expense. */
+    val selectedToAccountId: String? = null,
     val dateEpochDay: Long = LocalDate.now().toEpochDay(),
     val note: String = "",
     /** False until the database has been read, so "no accounts yet" is not confused with "still loading". */
@@ -48,8 +50,20 @@ data class QuickEntryUiState(
     val isEditing: Boolean = false,
 ) {
     val hasNoAccounts: Boolean get() = isLoaded && accounts.isEmpty()
+
+    val isTransfer: Boolean get() = type == TransactionType.TRANSFER
+
+    /** A transfer needs a second account, so one alone cannot make one. */
+    val canTransfer: Boolean get() = accounts.size >= 2
+
     val canSave: Boolean
-        get() = amountMinor > 0 && selectedAccountId != null && selectedCategoryId != null
+        get() = amountMinor > 0 && selectedAccountId != null && when (type) {
+            // No category on a transfer - it is not spending - but it does need somewhere
+            // for the money to land, and somewhere different from where it came from.
+            TransactionType.TRANSFER ->
+                selectedToAccountId != null && selectedToAccountId != selectedAccountId
+            else -> selectedCategoryId != null
+        }
 }
 
 /** User input; accounts and categories are observed from the database separately. */
@@ -59,6 +73,7 @@ private data class InputState(
     val type: TransactionType = TransactionType.EXPENSE,
     val selectedAccountId: String? = null,
     val selectedCategoryId: String? = null,
+    val selectedToAccountId: String? = null,
     val dateEpochDay: Long = LocalDate.now().toEpochDay(),
     val note: String = "",
 )
@@ -88,6 +103,7 @@ class QuickEntryViewModel @Inject constructor(
                 amountText = formatAmountForInput(existing.amountMinor),
                 type = existing.type,
                 selectedAccountId = existing.accountId,
+                selectedToAccountId = existing.accountToId,
                 selectedCategoryId = existing.categoryId,
                 dateEpochDay = existing.dateEpochDay,
                 note = existing.note.orEmpty(),
@@ -121,6 +137,7 @@ class QuickEntryViewModel @Inject constructor(
             selectedAccountId = input.selectedAccountId ?: accounts.firstOrNull()?.id,
             categories = categories,
             selectedCategoryId = input.selectedCategoryId,
+            selectedToAccountId = input.selectedToAccountId,
             dateEpochDay = input.dateEpochDay,
             note = input.note,
             isLoaded = true,
@@ -141,7 +158,21 @@ class QuickEntryViewModel @Inject constructor(
         it.copy(type = type, selectedCategoryId = null)
     }
 
-    fun onAccountSelected(accountId: String) = input.update { it.copy(selectedAccountId = accountId) }
+    fun onAccountSelected(accountId: String) = input.update {
+        // Picking the source that is already the destination would be a transfer to itself;
+        // clear the other end rather than silently saving nothing.
+        it.copy(
+            selectedAccountId = accountId,
+            selectedToAccountId = it.selectedToAccountId?.takeIf { to -> to != accountId },
+        )
+    }
+
+    fun onToAccountSelected(accountId: String) = input.update {
+        it.copy(
+            selectedToAccountId = accountId,
+            selectedAccountId = it.selectedAccountId?.takeIf { from -> from != accountId },
+        )
+    }
 
     fun onCategorySelected(categoryId: String) = input.update { it.copy(selectedCategoryId = categoryId) }
 
@@ -155,10 +186,34 @@ class QuickEntryViewModel @Inject constructor(
 
         viewModelScope.launch {
             val accountId = requireNotNull(state.selectedAccountId)
-            val categoryId = requireNotNull(state.selectedCategoryId)
             // An empty comment is stored as NULL, not as a blank string.
             val note = state.note.trim().takeIf { it.isNotEmpty() }
 
+            if (state.isTransfer) {
+                val toAccountId = requireNotNull(state.selectedToAccountId)
+                if (editedTransactionId == null) {
+                    transactionRepository.addTransfer(
+                        amountMinor = state.amountMinor,
+                        fromAccountId = accountId,
+                        toAccountId = toAccountId,
+                        dateEpochDay = state.dateEpochDay,
+                        note = note,
+                    )
+                } else {
+                    transactionRepository.updateTransfer(
+                        id = editedTransactionId,
+                        amountMinor = state.amountMinor,
+                        fromAccountId = accountId,
+                        toAccountId = toAccountId,
+                        dateEpochDay = state.dateEpochDay,
+                        note = note,
+                    )
+                }
+                savedChannel.send(Unit)
+                return@launch
+            }
+
+            val categoryId = requireNotNull(state.selectedCategoryId)
             if (editedTransactionId == null) {
                 transactionRepository.addIncomeOrExpense(
                     type = state.type,
@@ -184,8 +239,8 @@ class QuickEntryViewModel @Inject constructor(
     }
 }
 
+/** Which category grid to show. A transfer has none, so it never asks. */
 private fun TransactionType.toCategoryType(): CategoryType = when (this) {
     TransactionType.INCOME -> CategoryType.INCOME
-    TransactionType.EXPENSE -> CategoryType.EXPENSE
-    TransactionType.TRANSFER -> error("Quick entry does not create transfers")
+    TransactionType.EXPENSE, TransactionType.TRANSFER -> CategoryType.EXPENSE
 }

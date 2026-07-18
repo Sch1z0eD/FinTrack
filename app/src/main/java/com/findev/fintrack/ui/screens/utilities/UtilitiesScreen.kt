@@ -20,14 +20,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -42,14 +43,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.UndoSnackbarHost
+import com.findev.fintrack.ui.showUndo
 import com.findev.fintrack.data.monthlyChargeMinor
 import com.findev.fintrack.data.local.entity.BillingKind
+import com.findev.fintrack.ui.AppMenu
 import com.findev.fintrack.ui.NotificationPermissionRequest
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.floatingBottomBarSpace
@@ -71,6 +76,7 @@ fun UtilitiesScreen(
     val payDialog by viewModel.payDialog.collectAsStateWithLifecycle()
     val paidUndo by viewModel.paidUndo.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     // A metered meter with a reminder day is the reason the reading reminder needs to be
     // able to post - ask once one exists.
@@ -84,8 +90,12 @@ fun UtilitiesScreen(
     val undoLabel = stringResource(R.string.transactions_undo)
     LaunchedEffect(paidUndo) {
         if (paidUndo == null) return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(message = paidMessage, actionLabel = undoLabel)
-        if (result == SnackbarResult.ActionPerformed) viewModel.onUndoPaid() else viewModel.onUndoDismissed()
+        keyboard?.hide()
+        if (snackbarHostState.showUndo(paidMessage, undoLabel)) {
+            viewModel.onUndoPaid()
+        } else {
+            viewModel.onUndoDismissed()
+        }
     }
 
     // The floating bar overlaps the bottom of the screen, so everything anchored there
@@ -96,7 +106,7 @@ fun UtilitiesScreen(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0),
         snackbarHost = {
-            SnackbarHost(snackbarHostState, Modifier.padding(bottom = barSpace))
+            UndoSnackbarHost(snackbarHostState, bottomPadding = barSpace)
         },
         floatingActionButton = {
             if (state.selectedCount == 0) {
@@ -231,7 +241,7 @@ private fun AddUtilityButton(
         FloatingActionButton(onClick = { expanded = true }) {
             Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.meter_add))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.meter_add)) },
                 onClick = {
@@ -298,7 +308,7 @@ private fun GroupHeader(
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.group_menu))
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.group_rename)) },
                             onClick = {
@@ -308,6 +318,9 @@ private fun GroupHeader(
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.group_delete)) },
+                            colors = MenuDefaults.itemColors(
+                                textColor = MaterialTheme.colorScheme.error,
+                            ),
                             onClick = {
                                 menuOpen = false
                                 onDelete()

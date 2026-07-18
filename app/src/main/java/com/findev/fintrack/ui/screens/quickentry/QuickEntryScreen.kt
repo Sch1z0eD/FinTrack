@@ -1,10 +1,21 @@
 package com.findev.fintrack.ui.screens.quickentry
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,7 +41,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -51,6 +62,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -60,9 +72,13 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.TransactionType
+import com.findev.fintrack.ui.FieldShape
+import com.findev.fintrack.ui.PanelCorner
 import com.findev.fintrack.ui.dateLabel
+import com.findev.fintrack.ui.fieldColors
 import com.findev.fintrack.ui.formatMinor
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -85,6 +101,7 @@ fun QuickEntryScreen(
         onAmountTextChange = viewModel::onAmountTextChange,
         onTypeChange = viewModel::onTypeChange,
         onAccountSelected = viewModel::onAccountSelected,
+        onToAccountSelected = viewModel::onToAccountSelected,
         onCategorySelected = viewModel::onCategorySelected,
         onDateSelected = viewModel::onDateSelected,
         onNoteChange = viewModel::onNoteChange,
@@ -102,6 +119,7 @@ private fun QuickEntryContent(
     onAmountTextChange: (String) -> Unit,
     onTypeChange: (TransactionType) -> Unit,
     onAccountSelected: (String) -> Unit,
+    onToAccountSelected: (String) -> Unit,
     onCategorySelected: (String) -> Unit,
     onDateSelected: (Long) -> Unit,
     onNoteChange: (String) -> Unit,
@@ -161,25 +179,39 @@ private fun QuickEntryContent(
         ) {
             // The keyboard only opens on tap, so the category grid stays fully visible
             // until the amount is actually being typed.
-            OutlinedTextField(
+            // The amount is the headline of this screen, so it gets a panel of its own.
+            TextField(
                 value = state.amountText,
                 onValueChange = onAmountTextChange,
                 singleLine = true,
+                shape = RoundedCornerShape(PanelCorner),
+                colors = fieldColors(),
                 textStyle = MaterialTheme.typography.headlineMedium.copy(textAlign = TextAlign.End),
                 placeholder = {
                     Text(
                         text = "0,00",
                         style = MaterialTheme.typography.headlineMedium,
                         textAlign = TextAlign.End,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth(),
                     )
                 },
-                suffix = { Text("₽", style = MaterialTheme.typography.headlineSmall) },
+                suffix = {
+                    Text(
+                        text = "₽",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            TypeSelector(selected = state.type, onTypeChange = onTypeChange)
+            TypeSelector(
+                selected = state.type,
+                canTransfer = state.canTransfer,
+                onTypeChange = onTypeChange,
+            )
 
             AccountRow(
                 state = state,
@@ -228,11 +260,18 @@ private fun QuickEntryContent(
                 )
             }
 
-            if (noteVisible) {
-                OutlinedTextField(
+            // Sliding the field in beats having the grid below it jump on every toggle.
+            AnimatedVisibility(
+                visible = noteVisible,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                TextField(
                     value = state.note,
                     onValueChange = onNoteChange,
                     singleLine = true,
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     placeholder = { Text(stringResource(R.string.quick_entry_note)) },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -245,22 +284,38 @@ private fun QuickEntryContent(
                 if (noteVisible && state.note.isEmpty()) noteFocusRequester.requestFocus()
             }
 
-            CategoryGrid(
-                categories = state.categories,
-                selectedCategoryId = state.selectedCategoryId,
-                onCategorySelected = onCategorySelected,
-                onOpenCategories = onOpenCategories,
-                modifier = Modifier.weight(1f),
-            )
+            if (state.isTransfer) {
+                // A transfer has no category: nothing was spent, the money only moved.
+                TransferDestination(
+                    accounts = state.accounts,
+                    fromAccountId = state.selectedAccountId,
+                    toAccountId = state.selectedToAccountId,
+                    onToAccountSelected = onToAccountSelected,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                CategoryGrid(
+                    categories = state.categories,
+                    selectedCategoryId = state.selectedCategoryId,
+                    onCategorySelected = onCategorySelected,
+                    onOpenCategories = onOpenCategories,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
             Button(
                 onClick = onSave,
                 enabled = state.canSave,
+                shape = RoundedCornerShape(PanelCorner),
+                contentPadding = PaddingValues(vertical = 14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
             ) {
-                Text(stringResource(R.string.quick_entry_save))
+                Text(
+                    text = stringResource(R.string.quick_entry_save),
+                    style = MaterialTheme.typography.titleMedium,
+                )
             }
         }
     }
@@ -296,12 +351,16 @@ private fun QuickEntryContent(
 @Composable
 private fun TypeSelector(
     selected: TransactionType,
+    canTransfer: Boolean,
     onTypeChange: (TransactionType) -> Unit,
 ) {
-    val options = listOf(
-        TransactionType.EXPENSE to R.string.quick_entry_expense,
-        TransactionType.INCOME to R.string.quick_entry_income,
-    )
+    // Transfer is only offered when there is somewhere to transfer to; with one account
+    // it is an option that can never be completed.
+    val options = buildList {
+        add(TransactionType.EXPENSE to R.string.quick_entry_expense)
+        add(TransactionType.INCOME to R.string.quick_entry_income)
+        if (canTransfer) add(TransactionType.TRANSFER to R.string.quick_entry_transfer)
+    }
 
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         options.forEachIndexed { index, (type, labelRes) ->
@@ -360,6 +419,47 @@ private fun AccountRow(
     }
 }
 
+/**
+ * Where a transfer lands.
+ *
+ * The source account is left out of the list rather than shown disabled: an account cannot
+ * receive its own money, and offering it only to reject the tap teaches nothing.
+ */
+@Composable
+private fun TransferDestination(
+    accounts: List<AccountEntity>,
+    fromAccountId: String?,
+    toAccountId: String?,
+    onToAccountSelected: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.quick_entry_transfer_to),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            accounts.filter { it.id != fromAccountId }.forEach { account ->
+                FilterChip(
+                    selected = account.id == toAccountId,
+                    onClick = { onToAccountSelected(account.id) },
+                    label = { Text(account.name) },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun CategoryGrid(
     categories: List<CategoryEntity>,
@@ -372,6 +472,9 @@ private fun CategoryGrid(
         // 5 columns keeps the common expense categories reachable without scrolling.
         columns = GridCells.Fixed(5),
         modifier = modifier.fillMaxWidth(),
+        // Keeps the first row off the chips above it: with the grid flush against them a
+        // selected cell's ring touched the date chip and read as overlapping it.
+        contentPadding = PaddingValues(top = 4.dp, bottom = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -416,17 +519,27 @@ private fun CategoryCell(
     onClick: () -> Unit,
 ) {
     val accent = Color(category.color.toInt())
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(14.dp)
+
+    // Colour and ring only. Scaling the selected cell up was the first attempt and it
+    // grew past its own bounds into the row above, so a category in the top row visibly
+    // slid under the date chips.
+    val fill by animateColorAsState(
+        targetValue = accent.copy(alpha = if (selected) 0.32f else 0.12f),
+        label = "categoryFill",
+    )
+    val ring by animateDpAsState(
+        targetValue = if (selected) 2.dp else 0.dp,
+        label = "categoryRing",
+    )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .clip(shape)
-            .background(accent.copy(alpha = if (selected) 0.30f else 0.12f))
-            .then(
-                if (selected) Modifier.border(2.dp, accent, shape) else Modifier,
-            )
+            .background(fill)
+            .border(ring, accent, shape)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 4.dp),
     ) {

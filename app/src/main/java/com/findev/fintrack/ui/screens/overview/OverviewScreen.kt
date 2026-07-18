@@ -15,7 +15,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,7 +30,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.MonthlyObligations
 import com.findev.fintrack.data.local.AccountBalance
+import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.ui.floatingBottomBarSpace
+import com.findev.fintrack.ui.heroGradient
+import com.findev.fintrack.ui.theme.MoneyColors
 import com.findev.fintrack.ui.formatMinor
 
 @Composable
@@ -68,12 +70,13 @@ fun OverviewScreen(
             TotalCard(
                 labelRes = R.string.overview_expense_month,
                 amountMinor = state.monthExpenseMinor,
+                amountColor = MoneyColors.expense,
                 modifier = Modifier.weight(1f),
             )
             TotalCard(
                 labelRes = R.string.overview_income_month,
                 amountMinor = state.monthIncomeMinor,
-                amountColor = MaterialTheme.colorScheme.primary,
+                amountColor = MoneyColors.income,
                 modifier = Modifier.weight(1f),
             )
         }
@@ -253,6 +256,7 @@ private fun AccountBalanceRow(
 
 @Composable
 private fun BalanceCard(balanceMinor: Long, freeMinor: Long, hasObligations: Boolean) {
+    // The one animated surface in the app - see Modifier.heroGradient.
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -263,6 +267,7 @@ private fun BalanceCard(balanceMinor: Long, freeMinor: Long, hasObligations: Boo
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heroGradient()
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -361,7 +366,7 @@ private fun ObligationsCard(obligations: MonthlyObligations) {
                 }
             }
 
-            LinearProgressIndicator(
+            FinTrackProgress(
                 progress = {
                     if (obligations.totalMinor == 0L) {
                         0f

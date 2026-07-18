@@ -8,6 +8,9 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,22 +19,24 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -40,8 +45,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -49,9 +56,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.data.AvailableUpdate
 import com.findev.fintrack.data.RELEASES_PAGE_URL
 import com.findev.fintrack.data.ThemeMode
+import com.findev.fintrack.ui.FieldShape
+import com.findev.fintrack.ui.PanelCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,153 +232,171 @@ private fun AboutCard(
     onGrantInstall: () -> Unit,
     onInstall: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.settings_about_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_version, versionName),
+    PanelCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_about_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = stringResource(R.string.settings_version, versionName),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when (updateState) {
+            UpdateUiState.Idle -> Unit
+
+            UpdateUiState.Checking -> Text(
+                text = stringResource(R.string.settings_checking),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            when (updateState) {
-                UpdateUiState.Idle -> Unit
+            UpdateUiState.UpToDate -> Text(
+                text = stringResource(R.string.settings_up_to_date),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
 
-                UpdateUiState.Checking -> Text(
-                    text = stringResource(R.string.settings_checking),
+            UpdateUiState.NoReleases -> Text(
+                text = stringResource(R.string.settings_no_releases),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            is UpdateUiState.Failed -> Text(
+                text = stringResource(R.string.settings_update_failed, updateState.reason),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+
+            is UpdateUiState.Downloading -> {
+                Text(
+                    text = stringResource(R.string.settings_update_downloading),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                val progress = updateState.progress
+                if (progress == null) {
+                    FinTrackProgress(modifier = Modifier.fillMaxWidth())
+                } else {
+                    FinTrackProgress(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
 
-                UpdateUiState.UpToDate -> Text(
-                    text = stringResource(R.string.settings_up_to_date),
+            is UpdateUiState.ReadyToInstall -> {
+                Text(
+                    text = stringResource(
+                        if (updateState.openInstaller) {
+                            R.string.settings_update_ready
+                        } else {
+                            R.string.settings_update_downloaded
+                        },
+                        updateState.update.versionName,
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Button(onClick = onInstall) {
+                    Text(stringResource(R.string.settings_update_install))
+                }
+            }
+
+            is UpdateUiState.Available -> {
+                Text(
+                    text = stringResource(
+                        R.string.settings_update_found,
+                        updateState.update.versionName,
+                    ),
+                    style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
-
-                UpdateUiState.NoReleases -> Text(
-                    text = stringResource(R.string.settings_no_releases),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                is UpdateUiState.Failed -> Text(
-                    text = stringResource(R.string.settings_update_failed, updateState.reason),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-
-                is UpdateUiState.Downloading -> {
+                if (updateState.update.notes.isNotBlank()) {
                     Text(
-                        text = stringResource(R.string.settings_update_downloading),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    val progress = updateState.progress
-                    if (progress == null) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    } else {
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-
-                is UpdateUiState.ReadyToInstall -> {
-                    Text(
-                        text = stringResource(
-                            if (updateState.openInstaller) {
-                                R.string.settings_update_ready
-                            } else {
-                                R.string.settings_update_downloaded
-                            },
-                            updateState.update.versionName,
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = onInstall) {
-                        Text(stringResource(R.string.settings_update_install))
-                    }
-                }
-
-                is UpdateUiState.Available -> {
-                    Text(
-                        text = stringResource(
-                            R.string.settings_update_found,
-                            updateState.update.versionName,
-                        ),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    if (updateState.update.notes.isNotBlank()) {
-                        Text(
-                            text = updateState.update.notes,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 6,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    // Without this the installer opens and immediately refuses; better to say
-                    // so before the download than after it.
-                    if (!canInstall) {
-                        Text(
-                            text = stringResource(R.string.settings_install_permission),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        TextButton(onClick = onGrantInstall) {
-                            Text(stringResource(R.string.settings_allow))
-                        }
-                    }
-                    Button(onClick = { onDownload(updateState.update) }) {
-                        Text(stringResource(R.string.settings_update_download))
-                    }
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_auto_update),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_auto_update_desc),
+                        text = updateState.update.notes,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Switch(checked = autoCheckEnabled, onCheckedChange = onAutoCheckChange)
+                // Without this the installer opens and immediately refuses; better to say
+                // so before the download than after it.
+                if (!canInstall) {
+                    Text(
+                        text = stringResource(R.string.settings_install_permission),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = onGrantInstall) {
+                        Text(stringResource(R.string.settings_allow))
+                    }
+                }
+                Button(onClick = { onDownload(updateState.update) }) {
+                    Text(stringResource(R.string.settings_update_download))
+                }
             }
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // The whole row toggles, not just the switch: a 32dp target on a settings list
+        // is the kind of thing you miss on a phone.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(FieldShape)
+                .toggleable(
+                    value = autoCheckEnabled,
+                    onValueChange = onAutoCheckChange,
+                    role = Role.Switch,
+                )
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.settings_auto_update),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = stringResource(R.string.settings_auto_update_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(
+                checked = autoCheckEnabled,
+                // Null: the row above owns the gesture, so the switch must not also claim it.
+                onCheckedChange = null,
+                thumbContent = if (autoCheckEnabled) {
+                    {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                        )
+                    }
+                } else {
+                    null
+                },
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            TextButton(onClick = onOpenGithub) {
+                Text(stringResource(R.string.settings_open_github))
+            }
+            TextButton(
+                onClick = onCheck,
+                enabled = updateState !is UpdateUiState.Checking,
             ) {
-                TextButton(onClick = onOpenGithub) {
-                    Text(stringResource(R.string.settings_open_github))
-                }
-                TextButton(
-                    onClick = onCheck,
-                    enabled = updateState !is UpdateUiState.Checking,
-                ) {
-                    Text(stringResource(R.string.settings_check_updates))
-                }
+                Text(stringResource(R.string.settings_check_updates))
             }
         }
     }
@@ -385,34 +413,27 @@ private fun ThemeCard(
         ThemeMode.DARK to stringResource(R.string.settings_theme_dark),
     )
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.settings_theme_title),
-                style = MaterialTheme.typography.titleMedium,
-            )
-            Text(
-                text = stringResource(R.string.settings_theme_desc),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                ThemeMode.entries.forEachIndexed { index, mode ->
-                    SegmentedButton(
-                        selected = mode == selected,
-                        onClick = { onSelect(mode) },
-                        shape = SegmentedButtonDefaults.itemShape(
-                            index = index,
-                            count = ThemeMode.entries.size,
-                        ),
-                    ) {
-                        Text(labels.getValue(mode))
-                    }
+    PanelCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_theme_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = stringResource(R.string.settings_theme_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            ThemeMode.entries.forEachIndexed { index, mode ->
+                SegmentedButton(
+                    selected = mode == selected,
+                    onClick = { onSelect(mode) },
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = ThemeMode.entries.size,
+                    ),
+                ) {
+                    Text(labels.getValue(mode))
                 }
             }
         }
@@ -427,46 +448,46 @@ private fun PermissionCard(
     actionLabel: String,
     onAction: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+    PanelCard(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(text = title, style = MaterialTheme.typography.titleMedium)
-                if (granted) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Icon(
-                            imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_granted),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
+            Text(text = title, style = MaterialTheme.typography.titleMedium)
+            // Granting happens in a system screen, so this badge appears on return.
+            AnimatedVisibility(visible = granted, enter = fadeIn(), exit = fadeOut()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_granted),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
             }
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (!granted) {
-                TextButton(
-                    onClick = onAction,
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(actionLabel)
-                }
+        }
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!granted) {
+            TextButton(
+                onClick = onAction,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Text(actionLabel)
             }
         }
     }

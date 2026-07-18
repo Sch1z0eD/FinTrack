@@ -8,6 +8,7 @@ import com.findev.fintrack.data.LoanWithSchedule
 import com.findev.fintrack.data.TransactionRepository
 import com.findev.fintrack.data.local.entity.LoanEntity
 import com.findev.fintrack.data.local.entity.LoanPrepaymentEntity
+import com.findev.fintrack.data.local.dao.SettlementRow
 import com.findev.fintrack.data.local.entity.PrepaymentMode
 import com.findev.fintrack.data.toEngineLoan
 import com.findev.fintrack.data.toPrepayment
@@ -47,6 +48,13 @@ data class PrepaymentDialogState(
     val amountText: String = "",
     val dateEpochDay: Long,
     val mode: PrepaymentMode = PrepaymentMode.REDUCE_TERM,
+    /**
+     * The only mode this contract allows, or null when the bank permits both.
+     *
+     * When it is set the dialog shows that one alone: modelling the other would promise a
+     * schedule the bank will not produce.
+     */
+    val allowedMode: PrepaymentMode? = null,
     /** Null until the amount and date are good enough to simulate. */
     val simulation: PrepaymentSimulation? = null,
     val dateError: PrepaymentDateError? = null,
@@ -70,6 +78,8 @@ data class LoanDetailUiState(
     /** Debt outstanding today. */
     val balanceMinor: Long = 0,
     val nextPayment: ScheduleEntry? = null,
+    /** Every payment ever booked against this loan, newest first. */
+    val settlements: List<SettlementRow> = emptyList(),
     /** So the card can tell a prepayment that happened from one that is merely planned. */
     val todayEpochDay: Long = LocalDate.now().toEpochDay(),
     /** True while the next payment is due and there is somewhere to charge it. */
@@ -108,9 +118,10 @@ class LoanDetailViewModel @Inject constructor(
     val uiState: StateFlow<LoanDetailUiState> = combine(
         loanRepository.observeWithSchedule(loanId),
         transactionRepository.observePaidThrough(),
+        transactionRepository.observeSettlements(loanId),
         today,
         dialogInput,
-    ) { withSchedule, paidThroughAll, date, input ->
+    ) { withSchedule, paidThroughAll, settlements, date, input ->
         if (withSchedule == null) return@combine LoanDetailUiState(isLoaded = true)
 
         val loan = withSchedule.loan
@@ -135,6 +146,7 @@ class LoanDetailViewModel @Inject constructor(
                 date = date,
             ),
             nextPayment = next,
+            settlements = settlements,
             todayEpochDay = date.toEpochDay(),
             canMarkPaid = next != null && !next.date.isAfter(date) &&
                 loan.accountId != null && loan.categoryId != null,
@@ -182,6 +194,7 @@ class LoanDetailViewModel @Inject constructor(
             amountText = input.amountText,
             dateEpochDay = input.dateEpochDay,
             mode = input.mode,
+            allowedMode = data.loan?.allowedPrepaymentMode,
             simulation = simulation,
             dateError = dateError,
         )
@@ -195,10 +208,13 @@ class LoanDetailViewModel @Inject constructor(
         // The next payment date is where a prepayment usually goes, and it is always
         // inside the loan's life - unlike today, once the loan is paid off.
         val default = uiState.value.nextPayment?.date ?: LocalDate.now()
+        // Start on the mode the contract allows, so the dialog never opens on a choice
+        // that is about to be hidden.
+        val allowed = uiState.value.loan?.allowedPrepaymentMode
         dialogInput.value = DialogInput(
             amountText = "",
             dateEpochDay = default.toEpochDay(),
-            mode = PrepaymentMode.REDUCE_TERM,
+            mode = allowed ?: PrepaymentMode.REDUCE_TERM,
         )
     }
 
@@ -247,11 +263,16 @@ class LoanDetailViewModel @Inject constructor(
             categoryId = loan.categoryId ?: return,
             amountText = formatAmountForInput(next.paymentMinor),
             dateEpochDay = today.value.toEpochDay(),
+            dueAmountMinor = next.paymentMinor,
         )
     }
 
     fun onPayAmountChange(text: String) = _payDialog.update {
         it?.copy(amountText = sanitizeAmountInput(text))
+    }
+
+    fun onPayPartialChange(partial: Boolean) = _payDialog.update {
+        it?.copy(partialOverride = partial)
     }
 
     fun onPayDateChange(epochDay: Long) = _payDialog.update { it?.copy(dateEpochDay = epochDay) }

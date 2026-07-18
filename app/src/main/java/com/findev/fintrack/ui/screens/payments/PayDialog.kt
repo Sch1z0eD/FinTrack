@@ -11,7 +11,10 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.TextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -25,7 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.FieldShape
+import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.fieldColors
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.shortDate
 
@@ -43,6 +50,7 @@ private const val MILLIS_PER_DAY = 86_400_000L
 fun PayDialog(
     state: PayDialogState,
     onAmountChange: (String) -> Unit,
+    onPartialChange: (Boolean) -> Unit,
     onDateChange: (Long) -> Unit,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
@@ -51,6 +59,9 @@ fun PayDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        containerColor = dialogContainerColor(),
+        tonalElevation = 0.dp,
         title = { Text(state.name, maxLines = 1) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -60,15 +71,49 @@ fun PayDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                OutlinedTextField(
+                TextField(
                     value = state.amountText,
                     onValueChange = onAmountChange,
                     singleLine = true,
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     label = { Text(stringResource(R.string.recurring_amount)) },
                     suffix = { Text(stringResource(R.string.money_with_currency, "")) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
+
+                // Only offered once the amount differs from what was due: when they match
+                // there is nothing to decide, and a switch with one sensible position is
+                // just another thing to read.
+                if (state.dueAmountMinor > 0 && state.amountMinor != state.dueAmountMinor) {
+                    val options = listOf(
+                        false to R.string.payment_full,
+                        true to R.string.payment_partial,
+                    )
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        options.forEachIndexed { index, (partial, labelRes) ->
+                            SegmentedButton(
+                                selected = state.isPartial == partial,
+                                onClick = { onPartialChange(partial) },
+                                shape = SegmentedButtonDefaults.itemShape(index, options.size),
+                            ) {
+                                Text(stringResource(labelRes))
+                            }
+                        }
+                    }
+                    Text(
+                        text = stringResource(
+                            if (state.isPartial) {
+                                R.string.payment_partial_hint
+                            } else {
+                                R.string.payment_full_hint
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

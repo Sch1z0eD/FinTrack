@@ -18,6 +18,7 @@ import com.findev.fintrack.ui.screens.overview.OverviewScreen
 import com.findev.fintrack.ui.screens.settings.SettingsScreen
 import com.findev.fintrack.ui.screens.statistics.StatisticsScreen
 import com.findev.fintrack.ui.screens.payments.PaymentsScreen
+import com.findev.fintrack.ui.screens.payments.RecurringDetailScreen
 import com.findev.fintrack.ui.screens.payments.RecurringFormScreen
 import com.findev.fintrack.ui.screens.quickentry.QuickEntryScreen
 import com.findev.fintrack.ui.screens.transactions.TransactionsScreen
@@ -38,6 +39,7 @@ const val SETTINGS_ROUTE = "settings"
 const val LOAN_FORM_ROUTE = "loan_form"
 const val LOAN_FORM_ARG_LOAN_ID = "loanId"
 const val LOAN_DETAIL_ARG_LOAN_ID = "loanId"
+const val RECURRING_DETAIL_ARG_ID = "recurringDetailId"
 const val RECURRING_FORM_ROUTE = "recurring_form"
 const val RECURRING_FORM_ARG_ID = "recurringId"
 const val METER_FORM_ROUTE = "meter_form"
@@ -65,6 +67,10 @@ private const val RECURRING_FORM_ROUTE_PATTERN =
 /** Same screen for both: passing an id switches it to editing. */
 fun recurringFormRoute(id: String? = null): String =
     if (id == null) RECURRING_FORM_ROUTE else "$RECURRING_FORM_ROUTE?$RECURRING_FORM_ARG_ID=$id"
+
+private const val RECURRING_DETAIL_ROUTE_PATTERN = "recurring_detail/{$RECURRING_DETAIL_ARG_ID}"
+
+fun recurringDetailRoute(id: String): String = "recurring_detail/$id"
 
 private const val LOAN_DETAIL_ROUTE_PATTERN = "loan_detail/{$LOAN_DETAIL_ARG_LOAN_ID}"
 
@@ -134,7 +140,7 @@ fun FinTrackNavHost(
                 onAddLoan = { navController.navigate(loanFormRoute()) },
                 onAddRecurring = { navController.navigate(recurringFormRoute()) },
                 onOpenLoan = { id -> navController.navigate(loanDetailRoute(id)) },
-                onOpenRecurring = { id -> navController.navigate(recurringFormRoute(id)) },
+                onOpenRecurring = { id -> navController.navigate(recurringDetailRoute(id)) },
             )
         }
         composable(
@@ -150,6 +156,12 @@ fun FinTrackNavHost(
             RecurringFormScreen(
                 onDone = { navController.popBackStack() },
                 onOpenAccounts = { navController.navigate(ACCOUNTS_ROUTE) },
+            )
+        }
+        composable(RECURRING_DETAIL_ROUTE_PATTERN) {
+            RecurringDetailScreen(
+                onBack = { navController.popBackStack() },
+                onEdit = { id -> navController.navigate(recurringFormRoute(id)) },
             )
         }
         composable(LOAN_DETAIL_ROUTE_PATTERN) {

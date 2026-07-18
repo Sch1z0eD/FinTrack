@@ -1,9 +1,12 @@
 package com.findev.fintrack.ui.screens.categories
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,9 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -27,13 +31,18 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.CategoryType
+import com.findev.fintrack.ui.FieldShape
+import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.fieldColors
 
 /** Same palette the seeded categories use, so custom ones do not look foreign. */
 private val PALETTE = listOf(
@@ -61,6 +70,9 @@ fun CategoryDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        containerColor = dialogContainerColor(),
+        tonalElevation = 0.dp,
         title = {
             Text(
                 stringResource(
@@ -89,19 +101,35 @@ fun CategoryDialog(
                     }
                 }
 
-                OutlinedTextField(
+                TextField(
                     value = name,
                     onValueChange = { name = it },
                     singleLine = true,
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     label = { Text(stringResource(R.string.categories_name)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                TextField(
                     value = icon,
                     // An emoji can be several code points, so allow a few characters.
                     onValueChange = { icon = it.take(4) },
                     singleLine = true,
+                    shape = FieldShape,
+                    colors = fieldColors(),
                     label = { Text(stringResource(R.string.categories_icon)) },
+                    // Live preview: the swatch shows what the row will actually look like.
+                    trailingIcon = {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(32.dp)
+                                .background(Color(color.toInt()).copy(alpha = 0.18f), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(text = icon, style = MaterialTheme.typography.titleMedium)
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -118,22 +146,26 @@ fun CategoryDialog(
                 ) {
                     PALETTE.forEach { swatch ->
                         val selected = swatch == color
+                        // The chosen swatch grows instead of just gaining a ring, so the
+                        // selection is obvious at a glance on a crowded row.
+                        val scale by animateFloatAsState(
+                            targetValue = if (selected) 1.18f else 1f,
+                            label = "swatchScale",
+                        )
+                        val ring by animateDpAsState(
+                            targetValue = if (selected) 3.dp else 0.dp,
+                            label = "swatchRing",
+                        )
                         Column(
                             modifier = Modifier
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 6.dp)
                                 .size(32.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
                                 .background(Color(swatch.toInt()), CircleShape)
-                                .then(
-                                    if (selected) {
-                                        Modifier.border(
-                                            3.dp,
-                                            MaterialTheme.colorScheme.onSurface,
-                                            CircleShape,
-                                        )
-                                    } else {
-                                        Modifier
-                                    },
-                                )
+                                .border(ring, MaterialTheme.colorScheme.onSurface, CircleShape)
                                 .clickable { color = swatch },
                         ) {}
                     }

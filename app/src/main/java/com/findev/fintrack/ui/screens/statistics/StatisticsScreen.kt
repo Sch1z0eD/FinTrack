@@ -43,7 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.MonthlyBar
-import com.findev.fintrack.data.StatPeriod
+import com.findev.fintrack.ui.PeriodFilterBar
 import com.findev.fintrack.ui.ChipRow
 import com.findev.fintrack.ui.formatMinor
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -111,10 +111,10 @@ fun StatisticsScreen(
 
             item { SectionTitle(stringResource(R.string.stats_categories_title)) }
             item {
-                ChipRow(
-                    items = StatPeriod.entries.map { it.name to stringResource(it.labelRes()) },
-                    selectedId = state.period.name,
-                    onSelected = { viewModel.onPeriodChange(StatPeriod.valueOf(it)) },
+                PeriodFilterBar(
+                    selection = state.selection,
+                    onPeriodChange = viewModel::onPeriodChange,
+                    onCustomRangeChange = viewModel::onCustomRangeChange,
                 )
             }
 

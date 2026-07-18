@@ -6,6 +6,7 @@ import com.findev.fintrack.data.LoanRepository
 import com.findev.fintrack.data.LoanWithSchedule
 import com.findev.fintrack.data.RecurringPaymentRepository
 import com.findev.fintrack.data.TransactionRepository
+import com.findev.fintrack.data.local.dao.SettlementRow
 import com.findev.fintrack.data.local.entity.LoanType
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
 import com.findev.fintrack.data.local.entity.RecurringPaymentEntity
@@ -22,6 +23,9 @@ import com.findev.fintrack.ui.formatAmountForInput
 import com.findev.fintrack.ui.parseAmountToMinor
 import com.findev.fintrack.ui.sanitizeAmountInput
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -73,8 +77,21 @@ sealed interface PaymentItem {
         val overpaymentMinor: Long,
         val accountId: String?,
         val categoryId: String?,
+        /** Paid so far against the instalment now due. Zero once it closes and the next one starts. */
+        val paidTowardsDueMinor: Long = 0,
+        /** Lead times this loan reminds at, furthest out first; empty when off. */
+        val reminderDays: List<Int> = emptyList(),
     ) : PaymentItem {
         val isClosed: Boolean get() = balanceMinor == 0L
+
+        /** What is still needed to close the instalment now due. */
+        val dueRemainingMinor: Long
+            get() = (dueAmountMinor - paidTowardsDueMinor).coerceAtLeast(0)
+
+        /** 0..1 of the instalment now due, for the part-payment bar. */
+        val duePaidFraction: Float
+            get() = if (dueAmountMinor <= 0) 0f
+            else (paidTowardsDueMinor.toFloat() / dueAmountMinor.toFloat()).coerceIn(0f, 1f)
 
         /**
          * An interest-only loan repays nothing until its balloon, so a progress bar would
@@ -111,8 +128,19 @@ sealed interface PaymentItem {
         /** Null when open-ended: a subscription is not progressing towards anything. */
         val totalCount: Int?,
         val settledCount: Int,
+        /** Paid so far against the occurrence now due. Zero once it closes and the next one starts. */
+        val paidTowardsDueMinor: Long = 0,
     ) : PaymentItem {
         val hasEnded: Boolean get() = dueDate == null
+
+        /** What is still needed to close the occurrence now due. */
+        val dueRemainingMinor: Long
+            get() = (dueAmountMinor - paidTowardsDueMinor).coerceAtLeast(0)
+
+        /** 0..1 of the occurrence now due, for the part-payment bar. */
+        val duePaidFraction: Float
+            get() = if (dueAmountMinor <= 0) 0f
+            else (paidTowardsDueMinor.toFloat() / dueAmountMinor.toFloat()).coerceIn(0f, 1f)
 
         /** Only a payment with an end has a finish line to draw. */
         val showsProgress: Boolean get() = totalCount != null
@@ -148,9 +176,23 @@ data class PayDialogState(
     val categoryId: String,
     val amountText: String,
     val dateEpochDay: Long,
+    /** What the occurrence was expected to cost, for the full/partial default. */
+    val dueAmountMinor: Long = 0,
+    /** Set once the user touches the switch; before that the amount decides. */
+    val partialOverride: Boolean? = null,
 ) {
     val amountMinor: Long get() = parseAmountToMinor(amountText)
     val canSave: Boolean get() = amountMinor > 0
+
+    /**
+     * Whether this closes the occurrence.
+     *
+     * Defaults from the amount - paying less than expected is almost always a part payment
+     * - but stays a choice, because a smaller amount is sometimes genuinely the whole thing:
+     * a final instalment is short by design, and a bank can agree to less.
+     */
+    val isPartial: Boolean
+        get() = partialOverride ?: (dueAmountMinor > 0 && amountMinor in 1 until dueAmountMinor)
 }
 
 /**
@@ -169,6 +211,7 @@ suspend fun TransactionRepository.settle(dialog: PayDialogState): String = addIn
     note = dialog.name,
     settlesPaymentId = dialog.paymentId,
     settlesDueEpochDay = dialog.dueDate.toEpochDay(),
+    settlesPartial = dialog.isPartial,
 )
 
 /**
@@ -254,10 +297,13 @@ class PaymentsViewModel @Inject constructor(
         // "Paid" is not stored anywhere - it is whatever the live transactions say, so
         // deleting an expense walks the payment back to unpaid on its own.
         transactionRepository.observePaidThrough(),
+        // Part payments live separately: they are real money against the occurrence but
+        // they deliberately do not close it, so they cannot come from paid-through.
+        transactionRepository.observeSettledAmounts(),
         today,
-    ) { loans, recurring, paidThrough, date ->
-        val items = loans.map { it.toItem(paidThrough[it.loan.id], date) } +
-            recurring.map { it.toItem(paidThrough[it.id], date) }
+    ) { loans, recurring, paidThrough, paidAmounts, date ->
+        val items = loans.map { it.toItem(paidThrough[it.loan.id], paidAmounts, date) } +
+            recurring.map { it.toItem(paidThrough[it.id], paidAmounts, date) }
 
         PaymentsUiState(
             // Soonest first; whatever has no next date has nothing to chase and sinks.
@@ -290,6 +336,7 @@ class PaymentsViewModel @Inject constructor(
             // because "usually" is not "always".
             amountText = formatAmountForInput(item.dueAmountMinor),
             dateEpochDay = today.value.toEpochDay(),
+            dueAmountMinor = item.dueAmountMinor,
         )
     }
 
@@ -298,6 +345,9 @@ class PaymentsViewModel @Inject constructor(
     }
 
     fun onPayDateChange(epochDay: Long) = _payDialog.update { it?.copy(dateEpochDay = epochDay) }
+
+    fun onPayPartialChange(partial: Boolean) =
+        _payDialog.update { it?.copy(partialOverride = partial) }
 
     fun onPayDismiss() {
         _payDialog.value = null
@@ -400,7 +450,11 @@ class PaymentsViewModel @Inject constructor(
     }
 }
 
-private fun LoanWithSchedule.toItem(paidThroughEpochDay: Long?, today: LocalDate): PaymentItem.Loan {
+private fun LoanWithSchedule.toItem(
+    paidThroughEpochDay: Long?,
+    paidAmounts: Map<Pair<String, Long>, Long>,
+    today: LocalDate,
+): PaymentItem.Loan {
     val paidThrough = paidThroughEpochDay?.let(LocalDate::ofEpochDay)
     val enginePrepayments = prepayments.map { it.toPrepayment() }
     val next = nextLoanDue(schedule, paidThrough, today)
@@ -419,11 +473,14 @@ private fun LoanWithSchedule.toItem(paidThroughEpochDay: Long?, today: LocalDate
         overpaymentMinor = summary.overpaymentMinor,
         accountId = loan.accountId,
         categoryId = loan.categoryId,
+        paidTowardsDueMinor = next?.let { paidAmounts[loan.id to it.date.toEpochDay()] } ?: 0,
+        reminderDays = loan.reminderDaysList,
     )
 }
 
 private fun RecurringPaymentEntity.toItem(
     paidThroughEpochDay: Long?,
+    paidAmounts: Map<Pair<String, Long>, Long>,
     today: LocalDate,
 ): PaymentItem.Recurring {
     val start = LocalDate.ofEpochDay(startDateEpochDay)
@@ -452,5 +509,6 @@ private fun RecurringPaymentEntity.toItem(
         startDateEpochDay = startDateEpochDay,
         totalCount = totalRecurrences(start, period, end),
         settledCount = settledRecurrences(start, period, paidThrough),
+        paidTowardsDueMinor = due?.let { paidAmounts[id to it.toEpochDay()] } ?: 0,
     )
 }

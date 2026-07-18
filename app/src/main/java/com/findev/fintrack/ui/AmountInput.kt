@@ -54,6 +54,70 @@ fun parseAmountToMinor(text: String): Long {
     return rubles * 100 + kopecks
 }
 
+/**
+ * Same as [sanitizeAmountInput] but keeps three decimals instead of two.
+ *
+ * Without this the money sanitizer silently eats the third digit as it is typed, so
+ * "28,572" becomes "28,57" in the field and the extra precision the storage unit was
+ * widened for never reaches it.
+ */
+fun sanitizeRateInput(text: String): String {
+    val builder = StringBuilder()
+    var separatorSeen = false
+    var decimals = 0
+
+    for (char in text) {
+        when {
+            char.isDigit() && !separatorSeen -> {
+                // A rate needs far fewer digits than money; three keeps 999% reachable
+                // and nonsense out.
+                if (builder.length < 3) builder.append(char)
+            }
+
+            char.isDigit() && decimals < 3 -> {
+                builder.append(char)
+                decimals++
+            }
+
+            (char == ',' || char == '.') && !separatorSeen && builder.isNotEmpty() -> {
+                builder.append(DECIMAL_SEPARATOR)
+                separatorSeen = true
+            }
+        }
+    }
+    return builder.toString()
+}
+
+/**
+ * Reads an interest rate into thousandths of a percent: "28,572" -> 28572.
+ *
+ * Separate from [parseAmountToMinor] because money has two decimals and a rate has three.
+ * Feeding a rate through the money parser silently drops the third digit, which is how
+ * 28,572% would quietly become 28,57%.
+ */
+fun parseRateToMilliPercent(text: String): Int {
+    val sanitized = sanitizeRateInput(text)
+    val separator = sanitized.indexOf(DECIMAL_SEPARATOR)
+
+    val wholePart = if (separator >= 0) sanitized.substring(0, separator) else sanitized
+    val fractionPart = if (separator >= 0) sanitized.substring(separator + 1) else ""
+
+    val whole = wholePart.toLongOrNull() ?: 0L
+    // "28,5" -> 28,500 and "28," -> 28,000. Anything past three digits is not a rate.
+    val fraction = fractionPart.take(3).padEnd(3, '0').toLongOrNull() ?: 0L
+
+    return (whole * 1000 + fraction).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+}
+
+/** Renders a rate back into the field, trimming the zeros the storage unit forces. */
+fun formatRateForInput(milliPercent: Int): String {
+    if (milliPercent == 0) return ""
+    val whole = milliPercent / 1000
+    val fraction = milliPercent % 1000
+    if (fraction == 0) return whole.toString()
+    return "$whole$DECIMAL_SEPARATOR" + fraction.toString().padStart(3, '0').trimEnd('0')
+}
+
 /** Renders kopecks back into the field, e.g. for editing an existing transaction. */
 fun formatAmountForInput(amountMinor: Long): String {
     if (amountMinor == 0L) return ""

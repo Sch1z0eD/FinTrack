@@ -26,7 +26,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -46,7 +51,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.LoanType
+import com.findev.fintrack.data.local.entity.PrepaymentMode
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.dateLabel
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -182,6 +191,24 @@ fun LoanFormScreen(
                 )
             }
 
+            if (state.showsFixedPayment) {
+                MoneyField(
+                    value = state.fixedPaymentText,
+                    onValueChange = viewModel::onFixedPaymentChange,
+                    labelRes = R.string.loan_fixed_payment,
+                )
+                Text(
+                    text = stringResource(R.string.loan_fixed_payment_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            PrepaymentRuleSelector(
+                selected = state.allowedPrepaymentMode,
+                onSelect = viewModel::onAllowedPrepaymentModeChange,
+            )
+
             MoneyField(
                 value = state.upfrontFeeText,
                 onValueChange = viewModel::onUpfrontFeeChange,
@@ -193,14 +220,11 @@ fun LoanFormScreen(
                 labelRes = R.string.loan_monthly_fee,
             )
 
-            OutlinedTextField(
-                value = state.reminderDaysText,
-                onValueChange = viewModel::onReminderDaysChange,
-                singleLine = true,
-                label = { Text(stringResource(R.string.loan_reminder_days)) },
-                supportingText = { Text(stringResource(R.string.loan_reminder_days_hint)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
+            ReminderSection(
+                enabled = state.reminderEnabled,
+                selectedDays = state.reminderDays,
+                onEnabledChange = viewModel::onReminderEnabledChange,
+                onDayToggle = viewModel::onReminderDayToggle,
             )
 
             // Only needed once "Оплачено" has to post a real expense, so the loan stays
@@ -290,6 +314,119 @@ fun LoanFormScreen(
             DatePicker(state = pickerState)
         }
     }
+}
+
+/**
+ * Reminder on/off plus how far ahead.
+ *
+ * The switch exists because the previous version had none: a reminder was turned off by
+ * clearing the days field, which nobody discovers, so the screen read as having no
+ * reminder setting at all. The presets cover what people actually pick; the field stays
+ * for anything else.
+ */
+@Composable
+private fun ReminderSection(
+    enabled: Boolean,
+    selectedDays: List<Int>,
+    onEnabledChange: (Boolean) -> Unit,
+    onDayToggle: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(FieldShape)
+            .toggleable(value = enabled, onValueChange = onEnabledChange, role = Role.Switch)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.reminder_enabled),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f),
+        )
+        // Null: the row owns the gesture, so the switch must not claim it too.
+        Switch(checked = enabled, onCheckedChange = null)
+    }
+
+    AnimatedVisibility(visible = enabled) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Multi-select: one warning is either too early to act on or too late to move
+            // money, so "за неделю" and "за день" are meant to be picked together.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                REMINDER_PRESETS.forEach { (days, labelRes) ->
+                    FilterChip(
+                        selected = days in selectedDays,
+                        onClick = { onDayToggle(days) },
+                        label = { Text(stringResource(labelRes)) },
+                    )
+                }
+            }
+            if (selectedDays.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.reminder_pick_at_least_one),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+/** Lead times worth one tap. Anything else goes in the field below them. */
+private val REMINDER_PRESETS = listOf(
+    0 to R.string.reminder_same_day,
+    1 to R.string.reminder_one_day,
+    3 to R.string.reminder_three_days,
+    7 to R.string.reminder_week,
+)
+
+/**
+ * Which prepayment mode the contract allows.
+ *
+ * A term, not a preference: a contract reading «уменьшение суммы платежей при сохранении
+ * дат» will not shorten the term, so letting the user model that would show a schedule the
+ * bank is never going to send.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrepaymentRuleSelector(
+    selected: PrepaymentMode?,
+    onSelect: (PrepaymentMode?) -> Unit,
+) {
+    val options = listOf(
+        null to R.string.loan_prepayment_rule_any,
+        PrepaymentMode.REDUCE_TERM to R.string.loan_prepayment_rule_term,
+        PrepaymentMode.REDUCE_PAYMENT to R.string.loan_prepayment_rule_payment,
+    )
+
+    Text(
+        text = stringResource(R.string.loan_prepayment_rule),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        options.forEachIndexed { index, (mode, labelRes) ->
+            SegmentedButton(
+                selected = selected == mode,
+                onClick = { onSelect(mode) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+            ) {
+                Text(stringResource(labelRes))
+            }
+        }
+    }
+    Text(
+        text = stringResource(R.string.loan_prepayment_rule_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 @Composable

@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -34,12 +35,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.UndoSnackbarHost
+import com.findev.fintrack.ui.showUndo
 import com.findev.fintrack.data.MonthlyConsumption
 import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.data.local.entity.MeterEntity
@@ -70,6 +74,7 @@ fun MeterDetailScreen(
     val paidUndo by viewModel.paidUndo.collectAsStateWithLifecycle()
     val meter = state.meter
     val snackbarHostState = remember { SnackbarHostState() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     // The meter is read once, so coming back from the edit form has to re-read it.
     LaunchedEffect(Unit) { viewModel.refresh() }
@@ -78,11 +83,12 @@ fun MeterDetailScreen(
     val undoLabel = stringResource(R.string.transactions_undo)
     LaunchedEffect(paidUndo) {
         if (paidUndo == null) return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = paidMessage,
-            actionLabel = undoLabel,
-        )
-        if (result == SnackbarResult.ActionPerformed) viewModel.onUndoPaid() else viewModel.onUndoDismissed()
+        keyboard?.hide()
+        if (snackbarHostState.showUndo(paidMessage, undoLabel)) {
+            viewModel.onUndoPaid()
+        } else {
+            viewModel.onUndoDismissed()
+        }
     }
 
     Scaffold(
@@ -112,7 +118,7 @@ fun MeterDetailScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { UndoSnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         if (meter == null) return@Scaffold
 

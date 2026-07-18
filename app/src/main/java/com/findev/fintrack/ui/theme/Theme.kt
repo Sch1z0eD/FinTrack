@@ -19,8 +19,15 @@ fun ThemeMode.isDark(): Boolean = when (this) {
 @Composable
 fun FinTrackTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
-    // minSdk 31 guarantees Material You, so no API-level guard is needed here.
-    dynamicColor: Boolean = true,
+    /**
+     * Material You is off by default.
+     *
+     * It takes its colours from the wallpaper, so the app cannot promise any particular
+     * look - the warm palette in Color.kt would simply be ignored, and on a cool wallpaper
+     * every surface comes out grey-blue. Turning it on is a one-line change here if the
+     * wallpaper-matching is ever worth more than a consistent identity.
+     */
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = themeMode.isDark()

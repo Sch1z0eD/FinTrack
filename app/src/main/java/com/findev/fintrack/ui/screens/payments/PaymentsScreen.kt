@@ -10,21 +10,22 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,7 +48,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.UndoSnackbarHost
+import com.findev.fintrack.ui.showUndo
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
+import com.findev.fintrack.ui.AppMenu
+import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.ui.NotificationPermissionRequest
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.floatingBottomBarSpace
@@ -74,6 +80,7 @@ fun PaymentsScreen(
     val payDialog by viewModel.payDialog.collectAsStateWithLifecycle()
     val payAheadDialog by viewModel.payAheadDialog.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val keyboard = LocalSoftwareKeyboardController.current
 
     // Every due date and balance on this screen moves with the date.
     LifecycleResumeEffect(Unit) {
@@ -89,12 +96,10 @@ fun PaymentsScreen(
     val undoLabel = stringResource(R.string.transactions_undo)
     LaunchedEffect(undo) {
         if (undo == null) return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = paidMessage,
-            actionLabel = undoLabel,
-            withDismissAction = true,
-        )
-        if (result == SnackbarResult.ActionPerformed) {
+        // Drop focus first: the pay dialog has an input, and with the keyboard still up
+        // the resized window puts the bar halfway up the screen.
+        keyboard?.hide()
+        if (snackbarHostState.showUndo(paidMessage, undoLabel)) {
             viewModel.onUndoPaid()
         } else {
             viewModel.onUndoDismissed()
@@ -109,7 +114,7 @@ fun PaymentsScreen(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0),
         snackbarHost = {
-            SnackbarHost(snackbarHostState, Modifier.padding(bottom = barSpace))
+            UndoSnackbarHost(snackbarHostState, bottomPadding = barSpace)
         },
         floatingActionButton = {
             AddPaymentButton(
@@ -158,6 +163,7 @@ fun PaymentsScreen(
         PayDialog(
             state = dialog,
             onAmountChange = viewModel::onPayAmountChange,
+            onPartialChange = viewModel::onPayPartialChange,
             onDateChange = viewModel::onPayDateChange,
             onConfirm = viewModel::onPayConfirm,
             onDismiss = viewModel::onPayDismiss,
@@ -187,7 +193,7 @@ private fun AddPaymentButton(
         FloatingActionButton(onClick = { expanded = true }) {
             Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.payments_add))
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.payments_add_loan)) },
                 onClick = {
@@ -206,9 +212,79 @@ private fun AddPaymentButton(
     }
 }
 
+
+/** Says when the reminder will actually arrive, in the same words the form offered. */
+@Composable
+private fun ReminderRow(days: List<Int>) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Notifications,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        // Resolved before the join: stringResource is composable and cannot be called
+        // from inside joinToString's lambda.
+        val labels = days.map { stringResource(reminderDayLabel(it)).lowercase() }
+        Text(
+            text = stringResource(R.string.reminder_loan_card, labels.joinToString(", ")),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Same wording as the loan form, so the card never describes a setting differently. */
+private fun reminderDayLabel(days: Int): Int = when (days) {
+    0 -> R.string.reminder_same_day
+    1 -> R.string.reminder_one_day
+    3 -> R.string.reminder_three_days
+    7 -> R.string.reminder_week
+    else -> R.string.reminder_other_days
+}
+
+/**
+ * What has already been put against the instalment now due.
+ *
+ * Only drawn when there is a part payment: on a card that is fully paid or untouched this
+ * would be a bar at 0% or 100% saying nothing. A part payment is exactly the state the
+ * card could not previously express - the money was recorded, and the card looked
+ * identical to one where nothing had been paid at all.
+ */
+@Composable
+private fun PartialPaidSection(
+    paidMinor: Long,
+    dueMinor: Long,
+    remainingMinor: Long,
+    fraction: Float,
+) {
+    if (paidMinor <= 0L) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FinTrackProgress(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        LabelledRow(
+            label = stringResource(
+                R.string.payment_partial_paid,
+                formatMinor(paidMinor),
+                formatMinor(dueMinor),
+            ),
+            value = stringResource(
+                R.string.payment_partial_left,
+                formatMinor(remainingMinor),
+            ),
+        )
+    }
+}
+
 /** Label on the left, number on the right - the label yields so the money never wraps. */
 @Composable
-private fun LabelledRow(
+internal fun LabelledRow(
     label: String,
     value: String,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -312,11 +388,24 @@ private fun LoanCard(
             )
 
             if (loan.showsProgress) {
-                LinearProgressIndicator(
+                FinTrackProgress(
                     progress = { loan.progress },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+
+            // Recurring cards already showed a bell; a loan showed nothing, so a reminder
+            // that was switched on looked like it had not been.
+            if (loan.reminderDays.isNotEmpty()) {
+                ReminderRow(days = loan.reminderDays)
+            }
+
+            PartialPaidSection(
+                paidMinor = loan.paidTowardsDueMinor,
+                dueMinor = loan.dueAmountMinor,
+                remainingMinor = loan.dueRemainingMinor,
+                fraction = loan.duePaidFraction,
+            )
 
             loan.dueDate?.let { due ->
                 LabelledRow(
@@ -406,7 +495,7 @@ private fun overdueColor(isOverdue: Boolean) = if (isOverdue) {
 }
 
 @Composable
-private fun dueLabel(due: java.time.LocalDate, isOverdue: Boolean, normalRes: Int): String =
+internal fun dueLabel(due: java.time.LocalDate, isOverdue: Boolean, normalRes: Int): String =
     if (isOverdue) {
         stringResource(R.string.payment_overdue, dateLabel(due.toEpochDay()))
     } else {
@@ -440,6 +529,13 @@ private fun RecurringCard(
                 highlighted = false,
             )
 
+            PartialPaidSection(
+                paidMinor = payment.paidTowardsDueMinor,
+                dueMinor = payment.dueAmountMinor,
+                remainingMinor = payment.dueRemainingMinor,
+                fraction = payment.duePaidFraction,
+            )
+
             // Only a payment with an end date is going anywhere; an open-ended one has no
             // finish line and a bar towards nothing would be decoration.
             if (payment.showsProgress) {
@@ -452,7 +548,7 @@ private fun RecurringCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                LinearProgressIndicator(
+                FinTrackProgress(
                     progress = { payment.progress },
                     modifier = Modifier.fillMaxWidth(),
                 )

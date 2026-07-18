@@ -134,18 +134,32 @@ fun PrepaymentDialog(
                     )
 
                     else -> {
-                        ModeCard(
-                            titleRes = R.string.prepayment_mode_term,
-                            effect = simulation.reduceTerm,
-                            selected = state.mode == PrepaymentMode.REDUCE_TERM,
-                            onClick = { onModeChange(PrepaymentMode.REDUCE_TERM) },
-                        )
-                        ModeCard(
-                            titleRes = R.string.prepayment_mode_payment,
-                            effect = simulation.reducePayment,
-                            selected = state.mode == PrepaymentMode.REDUCE_PAYMENT,
-                            onClick = { onModeChange(PrepaymentMode.REDUCE_PAYMENT) },
-                        )
+                        // A contract that permits only one mode gets only that card. The
+                        // comparison is the point of this dialog, so when there is nothing
+                        // to compare say why rather than showing a lone card with no reason.
+                        if (state.allowedMode != null) {
+                            Text(
+                                text = stringResource(R.string.prepayment_mode_fixed),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (state.allowedMode != PrepaymentMode.REDUCE_PAYMENT) {
+                            ModeCard(
+                                titleRes = R.string.prepayment_mode_term,
+                                effect = simulation.reduceTerm,
+                                selected = state.mode == PrepaymentMode.REDUCE_TERM,
+                                onClick = { onModeChange(PrepaymentMode.REDUCE_TERM) },
+                            )
+                        }
+                        if (state.allowedMode != PrepaymentMode.REDUCE_TERM) {
+                            ModeCard(
+                                titleRes = R.string.prepayment_mode_payment,
+                                effect = simulation.reducePayment,
+                                selected = state.mode == PrepaymentMode.REDUCE_PAYMENT,
+                                onClick = { onModeChange(PrepaymentMode.REDUCE_PAYMENT) },
+                            )
+                        }
                     }
                 }
             }

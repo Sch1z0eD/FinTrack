@@ -10,10 +10,14 @@ import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.CategoryType
 import com.findev.fintrack.data.local.entity.LoanType
+import com.findev.fintrack.data.local.entity.PrepaymentMode
+import com.findev.fintrack.ui.formatRateForInput
 import com.findev.fintrack.ui.formatAmountForInput
 import com.findev.fintrack.ui.navigation.LOAN_FORM_ARG_LOAN_ID
 import com.findev.fintrack.ui.parseAmountToMinor
+import com.findev.fintrack.ui.parseRateToMilliPercent
 import com.findev.fintrack.ui.sanitizeAmountInput
+import com.findev.fintrack.ui.sanitizeRateInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -41,33 +45,48 @@ data class LoanFormUiState(
     val upfrontFeeText: String = "",
     val monthlyFeeText: String = "",
     /** Days before the payment to remind; blank means no reminder, "0" means on the day. */
-    val reminderDaysText: String = "3",
+    /** Lead times picked, furthest out first. Empty means reminders are off. */
+    val reminderDays: List<Int> = listOf(3),
+    val reminderEnabled: Boolean = true,
     /** Where "Оплачено" charges the payment from, and what it counts as. */
     val accounts: List<AccountEntity> = emptyList(),
     val selectedAccountId: String? = null,
     val categories: List<CategoryEntity> = emptyList(),
     val selectedCategoryId: String? = null,
     val isEditing: Boolean = false,
+    /** Payment copied from the contract; blank means "derive it from the rate". */
+    val fixedPaymentText: String = "",
+    /** The only mode the contract permits, or null when the bank allows both. */
+    val allowedPrepaymentMode: PrepaymentMode? = null,
 ) {
     val principalMinor: Long get() = parseAmountToMinor(principalText)
-    val rateBp: Int get() = parseAmountToMinor(rateText).toInt()
+    val rateMilliPercent: Int get() = parseRateToMilliPercent(rateText)
     val termMonths: Int get() = termText.toIntOrNull() ?: 0
     val paymentDay: Int get() = paymentDayText.toIntOrNull() ?: 0
+    val fixedPaymentMinor: Long? get() = parseAmountToMinor(fixedPaymentText).takeIf { it > 0 }
     val upfrontFeeMinor: Long get() = parseAmountToMinor(upfrontFeeText)
     val monthlyFeeMinor: Long get() = parseAmountToMinor(monthlyFeeText)
 
     /** Blank field means "no reminder"; any digits are the lead days (0 = on the day). */
-    val reminderDaysBefore: Int? get() = reminderDaysText.toIntOrNull()
+    /**
+     * What gets saved. Driven by [reminderEnabled] rather than by the list being empty:
+     * "unpick everything to switch it off" is not something anyone discovers, which is why
+     * the loan screen looked like it had no reminder setting at all.
+     */
+    val savedReminderDays: List<Int> get() = if (reminderEnabled) reminderDays else emptyList()
 
     /** An instalment plan is 0% by definition, so its rate field is not asked for. */
     val showsRate: Boolean get() = type != LoanType.INSTALLMENT
+
+    /** Only a level-payment loan has a payment to override - see Loan.fixedPaymentMinor. */
+    val showsFixedPayment: Boolean get() = type == LoanType.ANNUITY
 
     val canSave: Boolean
         get() = name.isNotBlank() &&
             principalMinor > 0 &&
             termMonths > 0 &&
             paymentDay in 1..31 &&
-            (!showsRate || rateBp >= 0)
+            (!showsRate || rateMilliPercent >= 0)
 }
 
 @HiltViewModel
@@ -117,13 +136,16 @@ class LoanFormViewModel @Inject constructor(
                         name = loan.name,
                         type = loan.type,
                         principalText = formatAmountForInput(loan.principalMinor),
-                        rateText = formatAmountForInput(loan.rateBp.toLong()),
+                        rateText = formatRateForInput(loan.rateMilliPercent),
                         startDateEpochDay = loan.startDateEpochDay,
                         termText = loan.termMonths.toString(),
                         paymentDayText = loan.paymentDay.toString(),
+                        fixedPaymentText = loan.fixedPaymentMinor?.let(::formatAmountForInput).orEmpty(),
+                        allowedPrepaymentMode = loan.allowedPrepaymentMode,
                         upfrontFeeText = formatAmountForInput(loan.upfrontFeeMinor),
                         monthlyFeeText = formatAmountForInput(loan.monthlyFeeMinor),
-                        reminderDaysText = loan.reminderDaysBefore?.toString() ?: "",
+                        reminderDays = loan.reminderDaysList.ifEmpty { listOf(3) },
+                        reminderEnabled = loan.reminderDaysList.isNotEmpty(),
                         // A loan saved before these existed keeps whatever default landed.
                         selectedAccountId = loan.accountId ?: state.selectedAccountId,
                         selectedCategoryId = loan.categoryId ?: state.selectedCategoryId,
@@ -149,7 +171,13 @@ class LoanFormViewModel @Inject constructor(
         it.copy(principalText = sanitizeAmountInput(text))
     }
 
-    fun onRateChange(text: String) = _uiState.update { it.copy(rateText = sanitizeAmountInput(text)) }
+    fun onFixedPaymentChange(text: String) =
+        _uiState.update { it.copy(fixedPaymentText = sanitizeAmountInput(text)) }
+
+    fun onAllowedPrepaymentModeChange(mode: PrepaymentMode?) =
+        _uiState.update { it.copy(allowedPrepaymentMode = mode) }
+
+    fun onRateChange(text: String) = _uiState.update { it.copy(rateText = sanitizeRateInput(text)) }
 
     fun onStartDateChange(epochDay: Long) = _uiState.update { it.copy(startDateEpochDay = epochDay) }
 
@@ -169,8 +197,18 @@ class LoanFormViewModel @Inject constructor(
         it.copy(monthlyFeeText = sanitizeAmountInput(text))
     }
 
-    fun onReminderDaysChange(text: String) = _uiState.update {
-        it.copy(reminderDaysText = text.filter(Char::isDigit).take(2))
+    /** Toggles one lead time; the rest stay as they were. */
+    fun onReminderDayToggle(days: Int) = _uiState.update { state ->
+        val next = if (days in state.reminderDays) {
+            state.reminderDays - days
+        } else {
+            state.reminderDays + days
+        }
+        state.copy(reminderDays = next.sortedDescending())
+    }
+
+    fun onReminderEnabledChange(enabled: Boolean) = _uiState.update {
+        it.copy(reminderEnabled = enabled)
     }
 
     fun onDelete() {
@@ -187,13 +225,13 @@ class LoanFormViewModel @Inject constructor(
         if (!state.canSave) return
 
         viewModelScope.launch {
-            val rateBp = if (state.showsRate) state.rateBp else 0
+            val rateMilliPercent = if (state.showsRate) state.rateMilliPercent else 0
             if (editedLoanId == null) {
                 loanRepository.create(
                     name = state.name.trim(),
                     type = state.type,
                     principalMinor = state.principalMinor,
-                    rateBp = rateBp,
+                    rateMilliPercent = rateMilliPercent,
                     startDateEpochDay = state.startDateEpochDay,
                     termMonths = state.termMonths,
                     paymentDay = state.paymentDay,
@@ -201,7 +239,9 @@ class LoanFormViewModel @Inject constructor(
                     monthlyFeeMinor = state.monthlyFeeMinor,
                     accountId = state.selectedAccountId,
                     categoryId = state.selectedCategoryId,
-                    reminderDaysBefore = state.reminderDaysBefore,
+                    reminderDays = state.savedReminderDays,
+                    fixedPaymentMinor = state.fixedPaymentMinor.takeIf { state.showsFixedPayment },
+                    allowedPrepaymentMode = state.allowedPrepaymentMode,
                 )
             } else {
                 loanRepository.update(
@@ -209,7 +249,7 @@ class LoanFormViewModel @Inject constructor(
                     name = state.name.trim(),
                     type = state.type,
                     principalMinor = state.principalMinor,
-                    rateBp = rateBp,
+                    rateMilliPercent = rateMilliPercent,
                     startDateEpochDay = state.startDateEpochDay,
                     termMonths = state.termMonths,
                     paymentDay = state.paymentDay,
@@ -217,7 +257,9 @@ class LoanFormViewModel @Inject constructor(
                     monthlyFeeMinor = state.monthlyFeeMinor,
                     accountId = state.selectedAccountId,
                     categoryId = state.selectedCategoryId,
-                    reminderDaysBefore = state.reminderDaysBefore,
+                    reminderDays = state.savedReminderDays,
+                    fixedPaymentMinor = state.fixedPaymentMinor.takeIf { state.showsFixedPayment },
+                    allowedPrepaymentMode = state.allowedPrepaymentMode,
                 )
             }
             savedChannel.send(Unit)

@@ -1,5 +1,6 @@
 package com.findev.fintrack.ui.screens.accounts
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,16 +13,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -37,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,7 +46,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.AccountEntity
+import com.findev.fintrack.ui.AppMenu
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.RowCorner
+import com.findev.fintrack.ui.panelSurface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,7 +104,8 @@ fun AccountsScreen(
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     // Room for the FAB: without it the last row's "..." sits under the button.
-                    contentPadding = PaddingValues(bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(state.rows, key = { it.account.id }) { row ->
                         AccountListRow(
@@ -109,8 +115,9 @@ fun AccountsScreen(
                                 viewModel.onArchiveToggle(row.account.id, !row.account.isArchived)
                             },
                             onDelete = { viewModel.onDelete(row.account.id) },
+                            // Archiving reorders the list; without this rows teleport.
+                            modifier = Modifier.animateItem(),
                         )
-                        HorizontalDivider()
                     }
                 }
             }
@@ -167,14 +174,23 @@ private fun AccountListRow(
     onEdit: () -> Unit,
     onArchiveToggle: () -> Unit,
     onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
 
+    // Archived accounts are out of the balance, so they read back visually too.
+    val fade by animateFloatAsState(
+        targetValue = if (row.account.isArchived) 0.55f else 1f,
+        label = "accountFade",
+    )
+
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
+            .panelSurface(RoundedCornerShape(RowCorner))
             .clickable(onClick = onEdit)
-            .padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+            .padding(start = 16.dp, top = 10.dp, bottom = 10.dp)
+            .graphicsLayer { alpha = fade },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -205,7 +221,7 @@ private fun AccountListRow(
                     contentDescription = stringResource(R.string.accounts_actions),
                 )
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.accounts_edit)) },
                     onClick = {
@@ -230,8 +246,13 @@ private fun AccountListRow(
                         onArchiveToggle()
                     },
                 )
+                // Destructive item carries the warning colour; the icon set bundled here
+                // (material-icons-core) has no matching glyph, so colour does the work.
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.accounts_delete)) },
+                    colors = MenuDefaults.itemColors(
+                        textColor = MaterialTheme.colorScheme.error,
+                    ),
                     onClick = {
                         menuOpen = false
                         onDelete()
