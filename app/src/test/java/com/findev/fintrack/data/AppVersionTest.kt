@@ -46,6 +46,26 @@ class AppVersionTest {
     }
 
     @Test
+    fun `release notes lose their markdown and generated noise`() {
+        val raw = """
+            ## What's Changed
+            * **Fixed** the widget
+            versionCode: 100
+
+            **Full Changelog**: https://github.com/Sch1z0eD/FinTrack/commits/v0.1.0
+        """.trimIndent()
+
+        val formatted = formatReleaseNotes(raw)
+
+        assertEquals("## What's Changed\n* Fixed the widget", formatted)
+    }
+
+    @Test
+    fun `empty release notes stay empty`() {
+        assertEquals("", formatReleaseNotes(""))
+    }
+
+    @Test
     fun `surrounding whitespace is not silently accepted`() {
         assertNull(versionCodeFromTag(" v1.2.3"))
         assertNull(versionCodeFromTag("v1.2.3 "))

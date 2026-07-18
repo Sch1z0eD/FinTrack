@@ -9,6 +9,27 @@ data class AvailableUpdate(
 )
 
 /**
+ * Makes GitHub's release body readable in a plain Text.
+ *
+ * The notes are Markdown and the update card renders them as-is, so `**bold**` arrives with
+ * its asterisks showing. This strips the emphasis markers and drops the auto-generated
+ * "Full Changelog" link, which is a URL no one is going to type off a phone screen.
+ */
+fun formatReleaseNotes(raw: String): String = raw
+    .lineSequence()
+    .map { it.trim() }
+    .filterNot { line ->
+        line.startsWith("**Full Changelog**") ||
+            line.startsWith("Full Changelog") ||
+            // Older releases carried this; the app reads the version from the tag instead.
+            line.startsWith("versionCode:")
+    }
+    .map { it.replace("**", "").replace("__", "") }
+    .joinToString("\n")
+    .replace(Regex("\n{3,}"), "\n\n")
+    .trim()
+
+/**
  * Turns a release tag into a comparable version code, using the same formula the release
  * workflow uses to stamp the APK. Both sides deriving it from the tag is what keeps them
  * from disagreeing - there is no second place to update.

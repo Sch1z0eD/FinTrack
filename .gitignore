@@ -13,6 +13,11 @@ local.properties
 # IDE state. Nothing here is worth sharing with a future machine.
 .idea
 
+# Working notes. They stay on disk but out of the repository: the task log records real
+# contract amounts, meter readings and bill totals.
+CLAUDE.md
+TASKS.md
+
 # Build outputs and signing material must never reach the repository.
 *.apk
 *.aab

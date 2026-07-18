@@ -76,7 +76,7 @@ class UpdateRepository @Inject constructor(
                 versionName = tag.removePrefix("v"),
                 versionCode = versionCode,
                 apkUrl = apkUrl,
-                notes = json.optString("body").trim(),
+                notes = formatReleaseNotes(json.optString("body")),
             )
         }
     }

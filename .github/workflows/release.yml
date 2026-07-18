@@ -73,9 +73,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: fintrack-${{ steps.version.outputs.name }}.apk
-          # The in-app update check reads versionCode from here.
-          body: |
-            versionCode: ${{ steps.version.outputs.code }}
+          # No hand-written body: the app derives versionCode from the tag, so repeating it
+          # here would only be one more thing to keep in step - and it showed up as noise in
+          # the release notes the update screen displays.
           generate_release_notes: true
 
       - name: Remove keystore
