@@ -194,8 +194,14 @@ class UtilitiesViewModel @Inject constructor(
 
         // Named groups first, in their own order; anything ungrouped falls into «Прочее» at
         // the end - and only if there is something there.
-        val sections = groups.mapNotNull { group ->
-            byGroup[group.id]?.let { MeterGroupSection(group, it) }
+        //
+        // A named group is listed even while it is empty. Dropping it used to hide a group
+        // the moment it had no meters, which also hid its menu - so a group created by
+        // mistake could not be renamed or deleted, only lived on in the "move to group"
+        // picker. «Прочее» is different: it is not a real group, just a bucket, so an empty
+        // one has nothing to offer and nothing to delete.
+        val sections = groups.map { group ->
+            MeterGroupSection(group, byGroup[group.id].orEmpty())
         } + byGroup[null]?.let { listOf(MeterGroupSection(null, it)) }.orEmpty()
 
         UtilitiesUiState(sections = sections, groups = groups, selectedIds = selected, isLoaded = true)

@@ -294,10 +294,16 @@ private fun GroupHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = stringResource(
-                        R.string.group_total,
-                        stringResource(R.string.money_with_currency, formatMinor(section.totalMinor)),
-                    ),
+                    // An empty group shows why it is empty rather than "Итого 0,00 ₽",
+                    // which reads like a broken total instead of an invitation.
+                    text = if (section.items.isEmpty()) {
+                        stringResource(R.string.group_no_meters)
+                    } else {
+                        stringResource(
+                            R.string.group_total,
+                            stringResource(R.string.money_with_currency, formatMinor(section.totalMinor)),
+                        )
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

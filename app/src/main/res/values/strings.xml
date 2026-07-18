@@ -398,6 +398,7 @@
     <string name="group_create">Создать группу</string>
     <string name="group_rename">Переименовать</string>
     <string name="group_delete">Удалить группу</string>
+    <string name="group_no_meters">Пока без счётчиков</string>
     <string name="group_menu">Меню группы</string>
     <string name="group_name">Название группы</string>
     <string name="group_other">Прочее</string>
