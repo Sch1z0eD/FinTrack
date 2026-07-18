@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 92%, not less: at 80% a busy wallpaper reads straight through the numbers. -->
+    <color name="widget_glass_fill">#EB1B1B1F</color>
+    <color name="widget_glass_stroke">#33FFFFFF</color>
+</resources>

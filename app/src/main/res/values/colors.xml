@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Widget glass. A widget cannot blur what is behind it - RemoteViews has no such API and
+      Glance exposes none - so the frosted look is translucency over the wallpaper plus a
+      hairline edge, not a real backdrop blur.
+    -->
+    <color name="widget_glass_fill">#EBFFFFFF</color>
+    <color name="widget_glass_stroke">#33000000</color>
+</resources>

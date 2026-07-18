@@ -1,0 +1,15 @@
+# Normalise to LF in the repository. Without this, core.autocrlf on a Windows machine
+# decides line endings per checkout, and the Linux CI runner is the one that suffers.
+* text=auto eol=lf
+
+# Must keep CRLF to run on Windows.
+*.bat text eol=crlf
+
+# Must keep LF: the CI runner executes it as a shell script.
+gradlew text eol=lf
+
+*.jar binary
+*.png binary
+*.webp binary
+*.keystore binary
+*.jks binary

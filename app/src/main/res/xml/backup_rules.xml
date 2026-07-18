@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Used on API < 31 only. The Room database and DataStore are backed up: without a server
+  there is no other copy, so losing the phone would lose every transaction ever entered.
+-->
+<full-backup-content>
+    <include domain="database" path="." />
+    <include domain="file" path="datastore" />
+</full-backup-content>

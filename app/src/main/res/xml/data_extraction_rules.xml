@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 31+. Same reasoning as backup_rules.xml: the database is the only copy of the data.
+  Device-to-device transfer carries it too, so a new phone starts where the old one stopped.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="database" path="." />
+        <include domain="file" path="datastore" />
+    </device-transfer>
+</data-extraction-rules>

@@ -1,0 +1,21 @@
+*.iml
+.gradle
+.kotlin
+build
+/captures
+.externalNativeBuild
+.cxx
+.DS_Store
+
+# Machine-specific: SDK path.
+local.properties
+
+# IDE state. Nothing here is worth sharing with a future machine.
+.idea
+
+# Build outputs and signing material must never reach the repository.
+*.apk
+*.aab
+*.keystore
+*.jks
+keystore.properties

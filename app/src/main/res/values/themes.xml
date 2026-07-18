@@ -1,0 +1,4 @@
+<resources>
+    <!-- Only used until Compose takes over drawing; colors live in ui/theme/Theme.kt. -->
+    <style name="Theme.FinTrack" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
