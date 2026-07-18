@@ -76,6 +76,15 @@ data class LoanEntity(
     val reminderDays: String? = null,
 
     /**
+     * Epoch day of the first payment, when it is not one month after the loan.
+     *
+     * See com.findev.fintrack.loanengine.Loan.firstPaymentDate: banks often set it 30-60
+     * days out, and without it the whole schedule sits a month early.
+     */
+    @ColumnInfo(name = "first_payment_epoch_day")
+    val firstPaymentEpochDay: Long? = null,
+
+    /**
      * Payment size copied from the contract, or null to derive it from the rate.
      *
      * See com.findev.fintrack.loanengine.Loan.fixedPaymentMinor: some contracts publish a

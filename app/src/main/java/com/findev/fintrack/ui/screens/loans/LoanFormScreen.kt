@@ -12,6 +12,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -68,6 +69,7 @@ fun LoanFormScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
+    var showFirstPaymentPicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.saved.collect { onDone() } }
@@ -172,6 +174,37 @@ fun LoanFormScreen(
                 )
             }
 
+            // Optional, and only worth asking about when the contract disagrees with the
+            // default - so it sits as a chip that says what will happen, not a form field.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.loan_first_payment),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                AssistChip(
+                    onClick = { showFirstPaymentPicker = true },
+                    label = {
+                        Text(
+                            state.firstPaymentEpochDay
+                                ?.let { dateLabel(it) }
+                                ?: stringResource(R.string.loan_first_payment_default),
+                        )
+                    },
+                )
+                if (state.firstPaymentEpochDay != null) {
+                    IconButton(onClick = { viewModel.onFirstPaymentDateChange(null) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.loan_first_payment_clear),
+                        )
+                    }
+                }
+            }
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = state.termText,
@@ -264,6 +297,35 @@ fun LoanFormScreen(
 
     // A loan drags its rate history and prepayments with it, and one stray tap on a
     // top-bar icon should not take all of that.
+    if (showFirstPaymentPicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis =
+            (state.firstPaymentEpochDay ?: state.startDateEpochDay) * MILLIS_PER_DAY,
+        )
+        DatePickerDialog(
+            onDismissRequest = { showFirstPaymentPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis?.let {
+                            viewModel.onFirstPaymentDateChange(it / MILLIS_PER_DAY)
+                        }
+                        showFirstPaymentPicker = false
+                    },
+                ) {
+                    Text(stringResource(R.string.quick_entry_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFirstPaymentPicker = false }) {
+                    Text(stringResource(R.string.account_create_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },

@@ -286,6 +286,9 @@
     <string name="loan_rate_effective_from">Действует с</string>
     <string name="loan_rate_hint">Дата — с какого платёжного периода банк считает по новой ставке. В договоре может быть написано «со 2-го», но весь период с 1-го числа уже идёт по новой — тогда ставьте 1-е.</string>
     <string name="loan_start_date">Дата выдачи</string>
+    <string name="loan_first_payment">Первый платёж</string>
+    <string name="loan_first_payment_default">Через месяц</string>
+    <string name="loan_first_payment_clear">Вернуть «через месяц»</string>
     <string name="loan_term">Срок, месяцев</string>
     <string name="loan_payment_day">День платежа</string>
     <string name="prepayment_mode_fixed">По договору доступен только один способ досрочного погашения</string>

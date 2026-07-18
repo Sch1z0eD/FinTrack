@@ -31,6 +31,7 @@ fun LoanEntity.toEngineLoan(): EngineLoan = EngineLoan(
     upfrontFeeMinor = upfrontFeeMinor,
     monthlyFeeMinor = monthlyFeeMinor,
     fixedPaymentMinor = fixedPaymentMinor,
+    firstPaymentDate = firstPaymentEpochDay?.let(LocalDate::ofEpochDay),
 )
 
 fun LoanRateEntity.toRateChange(): RateChange = RateChange(

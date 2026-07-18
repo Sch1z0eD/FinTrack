@@ -40,6 +40,11 @@ data class LoanFormUiState(
      *  kopeck parser fits it unchanged: "16,9" -> 1690. */
     val rateText: String = "",
     val startDateEpochDay: Long = LocalDate.now().toEpochDay(),
+    /**
+     * Null means the usual "one month after the loan". Set when the contract says
+     * otherwise - a first payment 30-60 days out is common and shifts the whole schedule.
+     */
+    val firstPaymentEpochDay: Long? = null,
     val termText: String = "",
     val paymentDayText: String = "",
     val upfrontFeeText: String = "",
@@ -138,6 +143,7 @@ class LoanFormViewModel @Inject constructor(
                         principalText = formatAmountForInput(loan.principalMinor),
                         rateText = formatRateForInput(loan.rateMilliPercent),
                         startDateEpochDay = loan.startDateEpochDay,
+                        firstPaymentEpochDay = loan.firstPaymentEpochDay,
                         termText = loan.termMonths.toString(),
                         paymentDayText = loan.paymentDay.toString(),
                         fixedPaymentText = loan.fixedPaymentMinor?.let(::formatAmountForInput).orEmpty(),
@@ -180,6 +186,11 @@ class LoanFormViewModel @Inject constructor(
     fun onRateChange(text: String) = _uiState.update { it.copy(rateText = sanitizeRateInput(text)) }
 
     fun onStartDateChange(epochDay: Long) = _uiState.update { it.copy(startDateEpochDay = epochDay) }
+
+    /** Null clears it, putting the first payment back one month after the loan. */
+    fun onFirstPaymentDateChange(epochDay: Long?) = _uiState.update {
+        it.copy(firstPaymentEpochDay = epochDay)
+    }
 
     fun onTermChange(text: String) = _uiState.update {
         it.copy(termText = text.filter(Char::isDigit).take(3))
@@ -240,6 +251,7 @@ class LoanFormViewModel @Inject constructor(
                     accountId = state.selectedAccountId,
                     categoryId = state.selectedCategoryId,
                     reminderDays = state.savedReminderDays,
+                    firstPaymentEpochDay = state.firstPaymentEpochDay,
                     fixedPaymentMinor = state.fixedPaymentMinor.takeIf { state.showsFixedPayment },
                     allowedPrepaymentMode = state.allowedPrepaymentMode,
                 )
@@ -258,6 +270,7 @@ class LoanFormViewModel @Inject constructor(
                     accountId = state.selectedAccountId,
                     categoryId = state.selectedCategoryId,
                     reminderDays = state.savedReminderDays,
+                    firstPaymentEpochDay = state.firstPaymentEpochDay,
                     fixedPaymentMinor = state.fixedPaymentMinor.takeIf { state.showsFixedPayment },
                     allowedPrepaymentMode = state.allowedPrepaymentMode,
                 )

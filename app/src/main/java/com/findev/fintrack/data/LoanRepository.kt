@@ -102,6 +102,7 @@ class LoanRepository @Inject constructor(
         accountId: String?,
         categoryId: String?,
         reminderDays: List<Int>,
+        firstPaymentEpochDay: Long?,
         fixedPaymentMinor: Long?,
         allowedPrepaymentMode: PrepaymentMode?,
     ): String {
@@ -121,6 +122,7 @@ class LoanRepository @Inject constructor(
                 accountId = accountId,
                 categoryId = categoryId,
                 reminderDays = reminderDaysToStored(reminderDays),
+                firstPaymentEpochDay = firstPaymentEpochDay,
                 fixedPaymentMinor = fixedPaymentMinor,
                 allowedPrepaymentMode = allowedPrepaymentMode,
                 updatedAt = System.currentTimeMillis(),
@@ -143,6 +145,7 @@ class LoanRepository @Inject constructor(
         accountId: String?,
         categoryId: String?,
         reminderDays: List<Int>,
+        firstPaymentEpochDay: Long?,
         fixedPaymentMinor: Long?,
         allowedPrepaymentMode: PrepaymentMode?,
     ) {
@@ -161,6 +164,7 @@ class LoanRepository @Inject constructor(
                 accountId = accountId,
                 categoryId = categoryId,
                 reminderDays = reminderDaysToStored(reminderDays),
+                firstPaymentEpochDay = firstPaymentEpochDay,
                 fixedPaymentMinor = fixedPaymentMinor,
                 allowedPrepaymentMode = allowedPrepaymentMode,
                 updatedAt = System.currentTimeMillis(),

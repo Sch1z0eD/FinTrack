@@ -149,3 +149,15 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE loan_new RENAME TO loan")
     }
 }
+
+/**
+ * 4 -> 5: a loan can say when its first payment falls.
+ *
+ * Nullable, so every existing loan keeps its current behaviour - the first payment one
+ * month after the start date - without the migration having to guess anything.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE loan ADD COLUMN first_payment_epoch_day INTEGER")
+    }
+}

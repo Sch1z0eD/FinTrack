@@ -104,8 +104,20 @@ internal fun exactInterestWithRateChanges(
  * Date of payment number [number] (1-based), counted in whole months from [start].
  * Short months clamp: a 31st payment day lands on 28 February, or 29 in a leap year.
  */
-internal fun paymentDate(start: LocalDate, paymentDay: Int, number: Int): LocalDate {
-    val month = YearMonth.from(start).plusMonths(number.toLong())
+internal fun paymentDate(
+    start: LocalDate,
+    paymentDay: Int,
+    number: Int,
+    firstPaymentDate: LocalDate? = null,
+): LocalDate {
+    // With a first payment date given, it decides which month payment 1 lands in and the
+    // rest follow monthly from there. The day still comes from paymentDay, so there is one
+    // source for "the 17th" rather than two that can disagree.
+    val month = if (firstPaymentDate != null) {
+        YearMonth.from(firstPaymentDate).plusMonths((number - 1).toLong())
+    } else {
+        YearMonth.from(start).plusMonths(number.toLong())
+    }
     return month.atDay(minOf(paymentDay, month.lengthOfMonth()))
 }
 

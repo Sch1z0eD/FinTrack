@@ -59,7 +59,7 @@ private fun interestOnlySchedule(
     var periodStart = loan.startDate
 
     for (number in 1..loan.termMonths) {
-        val date = paymentDate(loan.startDate, loan.paymentDay, number)
+        val date = paymentDate(loan.startDate, loan.paymentDay, number, loan.firstPaymentDate)
         val insidePeriod = sortedPrepayments.filter { it.date > periodStart && it.date < date }
         val onPaymentDay = sortedPrepayments.filter { it.date == date }
 
@@ -161,7 +161,7 @@ private fun equalPrincipalSchedule(
     var slice = evenSlice(loan.principalMinor, loan.termMonths)
 
     for (number in 1..loan.termMonths) {
-        val date = paymentDate(loan.startDate, loan.paymentDay, number)
+        val date = paymentDate(loan.startDate, loan.paymentDay, number, loan.firstPaymentDate)
         val insidePeriod = sortedPrepayments.filter { it.date > periodStart && it.date < date }
         val onPaymentDay = sortedPrepayments.filter { it.date == date }
 
@@ -237,7 +237,7 @@ private fun annuitySchedule(
         ?: annuityPaymentMinor(loan.principalMinor, rateInPayment, loan.termMonths)
 
     for (number in 1..loan.termMonths) {
-        val date = paymentDate(loan.startDate, loan.paymentDay, number)
+        val date = paymentDate(loan.startDate, loan.paymentDay, number, loan.firstPaymentDate)
 
         // A change that took effect by the start of this period resizes the rest of the
         // schedule: the new payment is derived from what is still owed over what is left

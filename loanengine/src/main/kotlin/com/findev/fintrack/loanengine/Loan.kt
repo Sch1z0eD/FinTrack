@@ -79,6 +79,18 @@ data class Loan(
      * an approximation of what the bank will send back - flagged here rather than hidden.
      */
     val fixedPaymentMinor: Long? = null,
+    /**
+     * When the first payment falls, if it is not one month after [startDate].
+     *
+     * Banks routinely set it 30-60 days out, which is why a contract can read "срок 37
+     * месяцев" while listing 36 payments. Without this the whole schedule sits a month
+     * early and the opening period is short by a month of interest - on a Т-Банк contract
+     * of 136 000 ₽ at 39.9% that is roughly 4 500 ₽ of interest that never appears.
+     *
+     * Only the month is taken from it; the day of every payment, including the first, still
+     * comes from [paymentDay].
+     */
+    val firstPaymentDate: LocalDate? = null,
 ) {
     init {
         require(principalMinor > 0) { "Principal must be positive, was $principalMinor" }
@@ -95,6 +107,9 @@ data class Loan(
         }
         require(fixedPaymentMinor == null || type == LoanType.ANNUITY) {
             "A contract payment only makes sense for a level-payment loan, type was $type"
+        }
+        require(firstPaymentDate == null || firstPaymentDate.isAfter(startDate)) {
+            "The first payment cannot fall on or before the loan itself: $firstPaymentDate"
         }
     }
 }
