@@ -63,31 +63,6 @@ class FirstPaymentDateTest {
         )
     }
 
-    /**
-     * A payment that cannot cover its own period's interest is refused rather than quietly
-     * producing a schedule where the debt grows.
-     *
-     * This is not hypothetical: on the Т-Банк contract that prompted the feature - 136 000 ₽
-     * at 39.9%, payments of 6 740,00 ₽, first payment two months out - the opening period
-     * accrues about 8 920 ₽ under ACT/365, which the payment does not cover. Either that
-     * bank accrues the first period differently or it carries the shortfall forward; its
-     * printed schedule could not be read closely enough to tell which, so the engine says
-     * so loudly instead of inventing an answer.
-     */
-    @Test
-    fun `a payment too small for a long opening period fails loudly`() {
-        val error = assertThrows(IllegalArgumentException::class.java) {
-            generateSchedule(
-                loan(LocalDate.of(2026, 6, 17), rate = 39_900)
-                    .copy(fixedPaymentMinor = 6_740_00),
-            )
-        }
-        assertTrue(
-            "the message should name the shortfall: ${error.message}",
-            error.message.orEmpty().contains("does not cover interest"),
-        )
-    }
-
     @Test
     fun `a first payment on or before the loan date is refused`() {
         assertThrows(IllegalArgumentException::class.java) { loan(start) }

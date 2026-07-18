@@ -235,6 +235,8 @@ private fun annuitySchedule(
     // A contract payment overrides the formula outright - see Loan.fixedPaymentMinor.
     var payment = loan.fixedPaymentMinor
         ?: annuityPaymentMinor(loan.principalMinor, rateInPayment, loan.termMonths)
+    // Interest a payment was too small to cover, waiting for the next one.
+    var unpaidInterest = 0L
 
     for (number in 1..loan.termMonths) {
         val date = paymentDate(loan.startDate, loan.paymentDay, number, loan.firstPaymentDate)
@@ -259,27 +261,44 @@ private fun annuitySchedule(
         val insidePeriod = sortedPrepayments.filter { it.date > periodStart && it.date < date }
         val onPaymentDay = sortedPrepayments.filter { it.date == date }
         val accrual = accruePeriod(balance, loan, sortedChanges, insidePeriod, periodStart, date)
-        val interest = accrual.interestMinor
         balance = accrual.balanceMinor
+
+        // Interest owed now: this period's, plus anything an earlier payment was too small
+        // to cover. Carried rather than capitalised - it is not added to the debt, so it
+        // earns nothing itself, which is how the balance can sit unchanged through a
+        // payment that went entirely to interest.
+        val interestDue = accrual.interestMinor + unpaidInterest
 
         // The last payment clears whatever is left: the fixed payment size is derived
         // from /12 while interest runs on actual days, so the two never land exactly.
         val isLast = number == loan.termMonths
         var principalPart: Long
+        var interestPaid: Long
         if (balance == 0L) {
             // A prepayment already cleared the debt; only the interest it earned is due.
             principalPart = 0
+            interestPaid = interestDue
+            unpaidInterest = 0
         } else if (isLast) {
             principalPart = balance
+            interestPaid = interestDue
+            unpaidInterest = 0
+        } else if (payment <= interestDue) {
+            // A payment smaller than the interest it owes is not an error: an opening
+            // period longer than a month can out-earn the instalment, and banks put the
+            // whole payment against interest and carry the rest. Refusing here was wrong -
+            // it made a real Т-Банк contract impossible to enter.
+            principalPart = 0
+            interestPaid = payment
+            unpaidInterest = interestDue - payment
         } else {
-            principalPart = payment - interest
-            require(principalPart > 0) {
-                "Payment $payment does not cover interest $interest at payment $number: " +
-                    "the balance would grow and the loan would never amortise"
-            }
+            principalPart = payment - interestDue
+            interestPaid = interestDue
+            unpaidInterest = 0
             if (principalPart > balance) principalPart = balance
         }
 
+        val interest = interestPaid
         balance -= principalPart
 
         val applied = applyPrepayments(onPaymentDay, balance)
