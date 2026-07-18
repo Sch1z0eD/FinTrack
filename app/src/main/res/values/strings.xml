@@ -40,7 +40,8 @@
     <string name="settings_update_found">Доступна версия %1$s</string>
     <string name="settings_update_download">Скачать</string>
     <string name="settings_update_downloading">Загружается…</string>
-    <string name="settings_update_ready">Загружено. Если окно установки не открылось — нажмите кнопку.</string>
+    <string name="settings_update_ready">Версия %1$s загружена. Если окно установки не открылось — нажмите кнопку.</string>
+    <string name="settings_update_downloaded">Версия %1$s уже загружена, качать заново не нужно.</string>
     <string name="settings_update_install">Установить</string>
     <string name="settings_update_failed">Не удалось проверить: %1$s</string>
     <string name="settings_auto_update">Проверять раз в сутки</string>

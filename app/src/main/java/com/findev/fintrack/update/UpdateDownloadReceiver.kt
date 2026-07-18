@@ -86,9 +86,3 @@ class UpdateDownloadReceiver : BroadcastReceiver() {
             .notify(DOWNLOAD_NOTIFICATION_TAG, DOWNLOAD_NOTIFICATION_ID, notification)
     }
 }
-
-/** Where [UpdateRepository.downloadApk] puts the file, so the UI can find it again. */
-fun downloadedApk(context: Context, versionName: String): File? {
-    val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
-    return File(dir, UpdateRepository.apkFileName(versionName)).takeIf { it.exists() }
-}

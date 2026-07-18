@@ -69,8 +69,9 @@ fun SettingsScreen(
     // raised straight away: the confirmation the installer session asks for cannot be shown
     // from the background, and that is what the notification is for. Keyed on the file so it
     // fires once per download rather than on every recomposition.
-    LaunchedEffect((updateState as? UpdateUiState.ReadyToInstall)?.file) {
-        if (updateState is UpdateUiState.ReadyToInstall) viewModel.onInstall()
+    val justDownloaded = (updateState as? UpdateUiState.ReadyToInstall)?.takeIf { it.openInstaller }
+    LaunchedEffect(justDownloaded?.file) {
+        if (justDownloaded != null) viewModel.onInstall()
     }
 
     // Every one of these can be changed from system settings while we are backgrounded, so the
@@ -284,12 +285,17 @@ private fun AboutCard(
 
                 is UpdateUiState.ReadyToInstall -> {
                     Text(
-                        text = stringResource(R.string.settings_update_ready),
+                        text = stringResource(
+                            if (updateState.openInstaller) {
+                                R.string.settings_update_ready
+                            } else {
+                                R.string.settings_update_downloaded
+                            },
+                            updateState.update.versionName,
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    // The installer is opened automatically below; this is for the case
-                    // where it was dismissed and the user wants another go.
                     Button(onClick = onInstall) {
                         Text(stringResource(R.string.settings_update_install))
                     }

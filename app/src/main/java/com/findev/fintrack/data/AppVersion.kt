@@ -5,6 +5,8 @@ data class AvailableUpdate(
     val versionName: String,
     val versionCode: Long,
     val apkUrl: String,
+    /** From the release asset; used to tell a finished download from a truncated one. */
+    val sizeBytes: Long,
     val notes: String,
 )
 

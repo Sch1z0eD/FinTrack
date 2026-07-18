@@ -20,7 +20,6 @@ import com.findev.fintrack.data.UpdateRepository
 import com.findev.fintrack.update.ApkInstaller
 import com.findev.fintrack.update.DOWNLOAD_NOTIFICATION_ID
 import com.findev.fintrack.update.DOWNLOAD_NOTIFICATION_TAG
-import com.findev.fintrack.update.downloadedApk
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -58,7 +57,16 @@ sealed interface UpdateUiState {
     data class Available(val update: AvailableUpdate) : UpdateUiState
     /** [progress] is null until the server reports a size. */
     data class Downloading(val update: AvailableUpdate, val progress: Float?) : UpdateUiState
-    data class ReadyToInstall(val update: AvailableUpdate, val file: File) : UpdateUiState
+    /**
+     * [openInstaller] is true only when the download just finished under the user's eyes.
+     * Finding an already-downloaded file during a check is not a reason to throw the system
+     * install dialog at someone who asked what version they were on.
+     */
+    data class ReadyToInstall(
+        val update: AvailableUpdate,
+        val file: File,
+        val openInstaller: Boolean,
+    ) : UpdateUiState
     data class Failed(val reason: String) : UpdateUiState
 }
 
@@ -106,9 +114,21 @@ class SettingsViewModel @Inject constructor(
             _updateState.value = updateRepository.fetchLatest().fold(
                 onSuccess = { update ->
                     if (update == null) {
+                        // Nothing to install: anything still sitting in the download folder
+                        // is a leftover of an update that has already been applied.
+                        updateRepository.clearDownloads(keepVersionName = null)
                         UpdateUiState.UpToDate
                     } else {
-                        UpdateUiState.Available(update)
+                        // Everything except this version is junk, including the half-finished
+                        // and the duplicate-named copies of it.
+                        updateRepository.clearDownloads(keepVersionName = update.versionName)
+
+                        val existing = updateRepository.downloadedApk(update)
+                        if (existing != null) {
+                            UpdateUiState.ReadyToInstall(update, existing, openInstaller = false)
+                        } else {
+                            UpdateUiState.Available(update)
+                        }
                     }
                 },
                 onFailure = { error ->
@@ -123,6 +143,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onDownloadUpdate(update: AvailableUpdate) {
+        // Otherwise DownloadManager finds the name taken and writes a second copy beside it.
+        updateRepository.clearDownloads(keepVersionName = null)
+
         val id = updateRepository.downloadApk(update) ?: return
         _updateState.value = UpdateUiState.Downloading(update, progress = null)
 
@@ -136,11 +159,11 @@ class SettingsViewModel @Inject constructor(
                 val state = updateRepository.downloadState(id)
                 when (state?.status) {
                     DownloadManager.STATUS_SUCCESSFUL -> {
-                        val file = downloadedApk(context, update.versionName)
+                        val file = updateRepository.downloadedApk(update)
                         _updateState.value = if (file == null) {
                             UpdateUiState.Failed("файл не найден после загрузки")
                         } else {
-                            UpdateUiState.ReadyToInstall(update, file)
+                            UpdateUiState.ReadyToInstall(update, file, openInstaller = true)
                         }
                         return@launch
                     }

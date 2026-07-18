@@ -11,6 +11,7 @@ import com.findev.fintrack.BuildConfig
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -88,10 +89,12 @@ class UpdateRepository @Inject constructor(
 
             if (parsed.versionCode <= installedVersionCode) return@runCatching null
 
+            val asset = apkAsset(release, tag)
             AvailableUpdate(
                 versionName = parsed.versionName,
                 versionCode = parsed.versionCode,
-                apkUrl = apkAssetUrl(release, tag),
+                apkUrl = asset.getString("browser_download_url"),
+                sizeBytes = asset.getLong("size"),
                 notes = formatReleaseNotes(release.optString("body")),
             )
         }
@@ -116,7 +119,7 @@ class UpdateRepository @Inject constructor(
     }
 
     /** Both APKs may hang off one release, so the name decides which one belongs to us. */
-    private fun apkAssetUrl(release: JSONObject, tag: String): String {
+    private fun apkAsset(release: JSONObject, tag: String): JSONObject {
         val assets = release.getJSONArray("assets")
         val apks = (0 until assets.length())
             .map { assets.getJSONObject(it) }
@@ -125,7 +128,6 @@ class UpdateRepository @Inject constructor(
         val wantsBeta = channel == ReleaseChannel.BETA
         return apks
             .firstOrNull { it.getString("name").contains(BETA_ASSET_MARKER) == wantsBeta }
-            ?.getString("browser_download_url")
             ?: error("Release $tag has no APK for the $channel channel")
     }
 
@@ -191,6 +193,47 @@ class UpdateRepository @Inject constructor(
                 ),
             )
         }
+    }
+
+    /**
+     * The already-downloaded APK for [update], or null if it is missing or incomplete.
+     *
+     * Size is checked rather than mere existence: DownloadManager writes straight to the
+     * destination, so an interrupted download leaves a short file sitting there looking
+     * exactly like a finished one.
+     */
+    fun downloadedApk(update: AvailableUpdate): File? {
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return null
+        val file = File(dir, apkFileName(update.versionName))
+        return file.takeIf { it.isFile && it.length() == update.sizeBytes }
+    }
+
+    /**
+     * Throws away downloaded APKs, keeping only the one for [keepVersionName].
+     *
+     * Both halves matter. Removing the DownloadManager record clears its entry and its
+     * notification; deleting stray files catches what DownloadManager itself created when
+     * a repeat download found the name taken and wrote fintrack-1.2.3-1.apk beside it.
+     */
+    fun clearDownloads(keepVersionName: String?) {
+        val keepName = keepVersionName?.let(::apkFileName)
+        val manager = context.getSystemService<DownloadManager>()
+
+        manager?.query(DownloadManager.Query())?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_ID)
+            val uriColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI)
+            val doomed = mutableListOf<Long>()
+            while (cursor.moveToNext()) {
+                val name = cursor.getString(uriColumn)?.substringAfterLast('/')
+                if (name == null || name != keepName) doomed += cursor.getLong(idColumn)
+            }
+            doomed.forEach { manager.remove(it) }
+        }
+
+        val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return
+        dir.listFiles()
+            ?.filter { it.name.endsWith(".apk", ignoreCase = true) && it.name != keepName }
+            ?.forEach { it.delete() }
     }
 
     /** Whether the user has already allowed this app to install packages. */
