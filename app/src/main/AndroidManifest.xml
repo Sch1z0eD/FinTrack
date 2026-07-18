@@ -87,17 +87,11 @@
             </intent-filter>
         </receiver>
 
-        <!-- Grants the package installer read access to the downloaded APK; it runs in
-             another process and cannot open our files directly. -->
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <!-- Receives the PackageInstaller session callbacks. Not exported: only the system
+             holds the PendingIntent that targets it. -->
+        <receiver
+            android:name=".update.InstallResultReceiver"
+            android:exported="false" />
 
         <!-- On-demand WorkManager: the app provides its own Configuration (with the Hilt
              worker factory) from FinTrackApplication, so the default startup initializer

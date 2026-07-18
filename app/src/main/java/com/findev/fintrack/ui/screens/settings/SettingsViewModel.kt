@@ -2,10 +2,12 @@ package com.findev.fintrack.ui.screens.settings
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.DownloadManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.ViewModel
@@ -15,15 +17,26 @@ import com.findev.fintrack.data.NoReleasesYetException
 import com.findev.fintrack.data.SettingsRepository
 import com.findev.fintrack.data.ThemeMode
 import com.findev.fintrack.data.UpdateRepository
+import com.findev.fintrack.update.ApkInstaller
+import com.findev.fintrack.update.DOWNLOAD_NOTIFICATION_ID
+import com.findev.fintrack.update.DOWNLOAD_NOTIFICATION_TAG
+import com.findev.fintrack.update.downloadedApk
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
+
+/** DownloadManager has no progress callback, so the screen asks it about twice a second. */
+private const val POLL_INTERVAL_MS = 500L
 
 /**
  * The permission and system toggles the app's reminders depend on. All three are read live
@@ -43,7 +56,9 @@ sealed interface UpdateUiState {
     data object UpToDate : UpdateUiState
     data object NoReleases : UpdateUiState
     data class Available(val update: AvailableUpdate) : UpdateUiState
-    data class Downloading(val update: AvailableUpdate) : UpdateUiState
+    /** [progress] is null until the server reports a size. */
+    data class Downloading(val update: AvailableUpdate, val progress: Float?) : UpdateUiState
+    data class ReadyToInstall(val update: AvailableUpdate, val file: File) : UpdateUiState
     data class Failed(val reason: String) : UpdateUiState
 }
 
@@ -52,6 +67,7 @@ class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val updateRepository: UpdateRepository,
+    private val apkInstaller: ApkInstaller,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -65,6 +81,8 @@ class SettingsViewModel @Inject constructor(
 
     private val _updateState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
     val updateState: StateFlow<UpdateUiState> = _updateState.asStateFlow()
+
+    private var downloadWatcher: Job? = null
 
     val installedVersionName: String get() = updateRepository.installedVersionName
 
@@ -105,10 +123,56 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun onDownloadUpdate(update: AvailableUpdate) {
-        // The system downloader takes it from here and reports through its own notification;
-        // UpdateDownloadReceiver posts the "install" one when the file lands.
-        updateRepository.downloadApk(update)
-        _updateState.value = UpdateUiState.Downloading(update)
+        val id = updateRepository.downloadApk(update) ?: return
+        _updateState.value = UpdateUiState.Downloading(update, progress = null)
+
+        // Watched here so the installer can open the moment the file lands, while the user
+        // is still looking at the screen they started the download from. The broadcast
+        // receiver stays as the fallback for when they have left the app - it can only put
+        // up a notification, because an activity cannot be started from the background.
+        downloadWatcher?.cancel()
+        downloadWatcher = viewModelScope.launch {
+            while (isActive) {
+                val state = updateRepository.downloadState(id)
+                when (state?.status) {
+                    DownloadManager.STATUS_SUCCESSFUL -> {
+                        val file = downloadedApk(context, update.versionName)
+                        _updateState.value = if (file == null) {
+                            UpdateUiState.Failed("файл не найден после загрузки")
+                        } else {
+                            UpdateUiState.ReadyToInstall(update, file)
+                        }
+                        return@launch
+                    }
+
+                    DownloadManager.STATUS_FAILED, null -> {
+                        _updateState.value = UpdateUiState.Failed("загрузка не удалась")
+                        return@launch
+                    }
+
+                    else -> _updateState.value =
+                        UpdateUiState.Downloading(update, state.fraction)
+                }
+                delay(POLL_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
+     * Hands the downloaded APK to the system installer. Called automatically the moment the
+     * download finishes while the screen is open, and by the button if that dialog was
+     * dismissed.
+     */
+    fun onInstall() {
+        val ready = _updateState.value as? UpdateUiState.ReadyToInstall ?: return
+        NotificationManagerCompat.from(context)
+            .cancel(DOWNLOAD_NOTIFICATION_TAG, DOWNLOAD_NOTIFICATION_ID)
+
+        viewModelScope.launch {
+            apkInstaller.install(ready.file).onFailure {
+                _updateState.value = UpdateUiState.Failed(it.message.orEmpty())
+            }
+        }
     }
 
     fun canInstallPackages(): Boolean = updateRepository.canInstallPackages()

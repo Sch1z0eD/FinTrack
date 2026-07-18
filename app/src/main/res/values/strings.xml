@@ -39,7 +39,9 @@
     <string name="settings_no_releases">Релизов пока нет</string>
     <string name="settings_update_found">Доступна версия %1$s</string>
     <string name="settings_update_download">Скачать</string>
-    <string name="settings_update_downloading">Загружается… уведомление придёт, когда можно будет установить</string>
+    <string name="settings_update_downloading">Загружается…</string>
+    <string name="settings_update_ready">Загружено. Если окно установки не открылось — нажмите кнопку.</string>
+    <string name="settings_update_install">Установить</string>
     <string name="settings_update_failed">Не удалось проверить: %1$s</string>
     <string name="settings_auto_update">Проверять раз в сутки</string>
     <string name="settings_auto_update_desc">Единственное обращение приложения в сеть. Выключено — проверка только по кнопке.</string>

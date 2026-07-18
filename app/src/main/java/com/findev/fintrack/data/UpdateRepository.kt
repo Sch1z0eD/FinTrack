@@ -30,6 +30,17 @@ private const val BETA_ASSET_MARKER = "-beta-"
 /** The repository exists but has never published a release. */
 class NoReleasesYetException : Exception("No releases published yet")
 
+/** Progress of a queued APK download. [DownloadManager.COLUMN_STATUS] values. */
+data class DownloadState(
+    val status: Int,
+    val bytesSoFar: Long,
+    val totalBytes: Long,
+) {
+    /** 0..1, or null while the server has not said how big the file is. */
+    val fraction: Float?
+        get() = if (totalBytes > 0) (bytesSoFar.toFloat() / totalBytes).coerceIn(0f, 1f) else null
+}
+
 private const val CONNECT_TIMEOUT_MS = 10_000
 private const val READ_TIMEOUT_MS = 15_000
 
@@ -159,6 +170,27 @@ class UpdateRepository @Inject constructor(
                 apkFileName(update.versionName),
             )
         return manager.enqueue(request)
+    }
+
+    /**
+     * Where a queued download has got to. Polled rather than observed because DownloadManager
+     * only reports through a broadcast on completion - and completion is precisely what the
+     * screen wants to react to before the broadcast turns it into a notification.
+     */
+    fun downloadState(id: Long): DownloadState? {
+        val manager = context.getSystemService<DownloadManager>() ?: return null
+        return manager.query(DownloadManager.Query().setFilterById(id)).use { cursor ->
+            if (cursor == null || !cursor.moveToFirst()) return null
+            DownloadState(
+                status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)),
+                bytesSoFar = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR),
+                ),
+                totalBytes = cursor.getLong(
+                    cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES),
+                ),
+            )
+        }
     }
 
     /** Whether the user has already allowed this app to install packages. */

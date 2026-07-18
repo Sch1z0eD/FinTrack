@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -35,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +64,14 @@ fun SettingsScreen(
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoUpdateCheck by viewModel.autoUpdateCheck.collectAsStateWithLifecycle()
     val context = LocalContext.current
+
+    // The screen is in the foreground, which is the whole reason the system dialog can be
+    // raised straight away: the confirmation the installer session asks for cannot be shown
+    // from the background, and that is what the notification is for. Keyed on the file so it
+    // fires once per download rather than on every recomposition.
+    LaunchedEffect((updateState as? UpdateUiState.ReadyToInstall)?.file) {
+        if (updateState is UpdateUiState.ReadyToInstall) viewModel.onInstall()
+    }
 
     // Every one of these can be changed from system settings while we are backgrounded, so the
     // state is re-read each time the screen comes back to the foreground.
@@ -138,6 +148,7 @@ fun SettingsScreen(
                             ),
                         )
                     },
+                    onInstall = viewModel::onInstall,
                 )
             }
 
@@ -208,6 +219,7 @@ private fun AboutCard(
     onAutoCheckChange: (Boolean) -> Unit,
     onOpenGithub: () -> Unit,
     onGrantInstall: () -> Unit,
+    onInstall: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -253,11 +265,35 @@ private fun AboutCard(
                     color = MaterialTheme.colorScheme.error,
                 )
 
-                is UpdateUiState.Downloading -> Text(
-                    text = stringResource(R.string.settings_update_downloading),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                is UpdateUiState.Downloading -> {
+                    Text(
+                        text = stringResource(R.string.settings_update_downloading),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val progress = updateState.progress
+                    if (progress == null) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
+
+                is UpdateUiState.ReadyToInstall -> {
+                    Text(
+                        text = stringResource(R.string.settings_update_ready),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // The installer is opened automatically below; this is for the case
+                    // where it was dismissed and the user wants another go.
+                    Button(onClick = onInstall) {
+                        Text(stringResource(R.string.settings_update_install))
+                    }
+                }
 
                 is UpdateUiState.Available -> {
                     Text(

@@ -11,15 +11,17 @@ import android.os.Environment
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.core.content.getSystemService
 import androidx.core.net.toUri
+import com.findev.fintrack.MainActivity
 import com.findev.fintrack.R
 import com.findev.fintrack.data.UpdateRepository
+import com.findev.fintrack.ui.navigation.SETTINGS_ROUTE
 import java.io.File
 
-private const val DOWNLOAD_NOTIFICATION_TAG = "app_update_ready"
-private const val DOWNLOAD_NOTIFICATION_ID = 2
+/** The settings screen clears this once it has opened the installer itself. */
+const val DOWNLOAD_NOTIFICATION_TAG = "app_update_ready"
+const val DOWNLOAD_NOTIFICATION_ID = 2
 
 /**
  * Fires when the downloaded APK has landed, and offers to install it.
@@ -60,10 +62,14 @@ class UpdateDownloadReceiver : BroadcastReceiver() {
             return
         }
 
-        val install = PendingIntent.getActivity(
+        // Opens the settings screen rather than the installer: a PackageInstaller session has
+        // to be committed by the app, and an app in the background cannot put the system's
+        // confirmation dialog on screen anyway.
+        val open = PendingIntent.getActivity(
             context,
             DOWNLOAD_NOTIFICATION_ID,
-            installIntent(context, file),
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_START_ROUTE, SETTINGS_ROUTE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
@@ -73,23 +79,11 @@ class UpdateDownloadReceiver : BroadcastReceiver() {
             .setContentText(context.getString(R.string.update_ready_text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
-            .setContentIntent(install)
+            .setContentIntent(open)
             .build()
 
         NotificationManagerCompat.from(context)
             .notify(DOWNLOAD_NOTIFICATION_TAG, DOWNLOAD_NOTIFICATION_ID, notification)
-    }
-}
-
-/**
- * The installer runs in another process, so the APK is handed over as a content:// URI with
- * a read grant - a file:// URI would be rejected outright.
- */
-fun installIntent(context: Context, file: File): Intent {
-    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    return Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, UpdateRepository.APK_MIME_TYPE)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }
 
