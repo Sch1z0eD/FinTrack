@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.dao.SettlementRow
+import com.findev.fintrack.data.local.entity.LoanRateEntity
 import com.findev.fintrack.data.local.entity.LoanPrepaymentEntity
 import com.findev.fintrack.data.local.entity.LoanType
 import com.findev.fintrack.data.local.entity.PrepaymentMode
@@ -53,6 +54,7 @@ import com.findev.fintrack.loanengine.LoanSummary
 import com.findev.fintrack.loanengine.ScheduleEntry
 import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.formatRateForInput
 import com.findev.fintrack.ui.screens.payments.PAID_GREEN
 import com.findev.fintrack.ui.screens.payments.PayDialog
 import com.findev.fintrack.ui.shortDate
@@ -76,6 +78,7 @@ fun LoanDetailScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val payDialog by viewModel.payDialog.collectAsStateWithLifecycle()
+    val rateDialog by viewModel.rateDialog.collectAsStateWithLifecycle()
     var showPaid by remember { mutableStateOf(false) }
 
     LifecycleResumeEffect(Unit) {
@@ -145,6 +148,16 @@ fun LoanDetailScreen(
                 )
             }
 
+            item(key = "rates") {
+                RatesCard(
+                    baseRateMilliPercent = state.loan?.rateMilliPercent ?: 0,
+                    startEpochDay = state.loan?.startDateEpochDay ?: 0,
+                    rates = state.rates,
+                    onAdd = viewModel::onAddRateClick,
+                    onDelete = viewModel::onDeleteRate,
+                )
+            }
+
             item(key = "prepayments") {
                 PrepaymentsCard(
                     prepayments = state.prepayments,
@@ -211,6 +224,16 @@ fun LoanDetailScreen(
                 HorizontalDivider()
             }
         }
+    }
+
+    rateDialog?.let { dialog ->
+        RateChangeDialog(
+            state = dialog,
+            onRateChange = viewModel::onRateDialogRateChange,
+            onDateChange = viewModel::onRateDialogDateChange,
+            onConfirm = viewModel::onRateDialogConfirm,
+            onDismiss = viewModel::onRateDialogDismiss,
+        )
     }
 
     state.dialog?.let { dialog ->
@@ -479,9 +502,10 @@ private fun SummaryCard(
 private fun SummaryRow(
     label: String,
     value: String,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
@@ -495,6 +519,85 @@ private fun SummaryRow(
         Text(text = value, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
     }
 }
+
+/**
+ * The rate over the life of the loan, and the way to add a step to it.
+ *
+ * Contracts with a stepped rate are common - a promotional rate for the first months, then
+ * the real one - and the schedule has always honoured them. There was simply no way to
+ * enter one, so such a loan could only be recorded at its opening rate and reported an
+ * overpayment far larger than the contract's.
+ */
+@Composable
+private fun RatesCard(
+    baseRateMilliPercent: Int,
+    startEpochDay: Long,
+    rates: List<LoanRateEntity>,
+    onAdd: () -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.loan_rates_title),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onAdd) {
+                    Text(stringResource(R.string.loan_rate_add))
+                }
+            }
+
+            // The opening rate is part of the loan, not a change, so it has no delete.
+            SummaryRow(
+                label = stringResource(
+                    R.string.loan_rate_from,
+                    shortDate(LocalDate.ofEpochDay(startEpochDay)),
+                ),
+                value = stringResource(R.string.loan_rate_percent, formatRate(baseRateMilliPercent)),
+            )
+
+            rates.forEach { rate ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SummaryRow(
+                        label = stringResource(
+                            R.string.loan_rate_from,
+                            shortDate(LocalDate.ofEpochDay(rate.effectiveFromEpochDay)),
+                        ),
+                        value = stringResource(
+                            R.string.loan_rate_percent,
+                            formatRate(rate.rateMilliPercent),
+                        ),
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { onDelete(rate.id) }) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = stringResource(R.string.loan_rate_delete),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 28572 -> "28,572". Same renderer the form uses, so the two never disagree. */
+private fun formatRate(milliPercent: Int): String = formatRateForInput(milliPercent)
 
 /** Everything ever paid against this loan, newest first. */
 @Composable

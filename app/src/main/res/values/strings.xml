@@ -263,6 +263,13 @@
     <string name="loan_schedule_hide_paid">Скрыть оплаченные</string>
     <string name="loan_principal">Сумма</string>
     <string name="loan_rate">Ставка, % годовых</string>
+    <string name="loan_rates_title">Ставка по договору</string>
+    <string name="loan_rate_add">Изменение ставки</string>
+    <string name="loan_rate_delete">Удалить изменение</string>
+    <string name="loan_rate_from">с %1$s</string>
+    <string name="loan_rate_percent">%1$s %%</string>
+    <string name="loan_rate_effective_from">Действует с</string>
+    <string name="loan_rate_hint">Дата — с какого платёжного периода банк считает по новой ставке. В договоре может быть написано «со 2-го», но весь период с 1-го числа уже идёт по новой — тогда ставьте 1-е.</string>
     <string name="loan_start_date">Дата выдачи</string>
     <string name="loan_term">Срок, месяцев</string>
     <string name="loan_payment_day">День платежа</string>

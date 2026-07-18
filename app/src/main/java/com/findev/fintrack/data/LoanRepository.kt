@@ -191,4 +191,27 @@ class LoanRepository @Inject constructor(
 
     suspend fun deletePrepayment(id: String) =
         loanPrepaymentDao.softDelete(id, System.currentTimeMillis())
+
+    /**
+     * Records that the rate changed from [effectiveFromEpochDay] onwards.
+     *
+     * The table, the engine and the schedule have supported this from the start - only the
+     * way in was missing, which made a two-rate contract impossible to enter correctly. A
+     * Yandex Bank loan that steps from 70% to 28.572% came out 57 140 rub over its real
+     * total, because the app had no way to be told about the second rate.
+     */
+    suspend fun addRateChange(loanId: String, rateMilliPercent: Int, effectiveFromEpochDay: Long) {
+        loanRateDao.insert(
+            LoanRateEntity(
+                id = UUID.randomUUID().toString(),
+                loanId = loanId,
+                rateMilliPercent = rateMilliPercent,
+                effectiveFromEpochDay = effectiveFromEpochDay,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    suspend fun deleteRateChange(id: String) =
+        loanRateDao.softDelete(id, System.currentTimeMillis())
 }

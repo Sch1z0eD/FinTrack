@@ -9,6 +9,7 @@ import com.findev.fintrack.data.TransactionRepository
 import com.findev.fintrack.data.local.entity.LoanEntity
 import com.findev.fintrack.data.local.entity.LoanPrepaymentEntity
 import com.findev.fintrack.data.local.dao.SettlementRow
+import com.findev.fintrack.data.local.entity.LoanRateEntity
 import com.findev.fintrack.data.local.entity.PrepaymentMode
 import com.findev.fintrack.data.toEngineLoan
 import com.findev.fintrack.data.toPrepayment
@@ -22,6 +23,8 @@ import com.findev.fintrack.loanengine.simulatePrepayment
 import com.findev.fintrack.ui.formatAmountForInput
 import com.findev.fintrack.ui.navigation.LOAN_DETAIL_ARG_LOAN_ID
 import com.findev.fintrack.ui.parseAmountToMinor
+import com.findev.fintrack.ui.parseRateToMilliPercent
+import com.findev.fintrack.ui.sanitizeRateInput
 import com.findev.fintrack.ui.sanitizeAmountInput
 import com.findev.fintrack.ui.screens.payments.PayDialogState
 import com.findev.fintrack.ui.screens.payments.settle
@@ -70,6 +73,20 @@ data class PrepaymentDialogState(
         }
 }
 
+/**
+ * A rate change being entered.
+ *
+ * Its own dialog rather than a field on the loan form: a rate change is an event with a
+ * date, not a property of the contract, and a loan can collect several over its life.
+ */
+data class RateDialogState(
+    val rateText: String = "",
+    val dateEpochDay: Long,
+) {
+    val rateMilliPercent: Int get() = parseRateToMilliPercent(rateText)
+    val canSave: Boolean get() = rateMilliPercent > 0
+}
+
 data class LoanDetailUiState(
     val loan: LoanEntity? = null,
     val schedule: List<ScheduleEntry> = emptyList(),
@@ -80,6 +97,8 @@ data class LoanDetailUiState(
     val nextPayment: ScheduleEntry? = null,
     /** Every payment ever booked against this loan, newest first. */
     val settlements: List<SettlementRow> = emptyList(),
+    /** Rate changes on record, earliest first. */
+    val rates: List<LoanRateEntity> = emptyList(),
     /** So the card can tell a prepayment that happened from one that is merely planned. */
     val todayEpochDay: Long = LocalDate.now().toEpochDay(),
     /** True while the next payment is due and there is somewhere to charge it. */
@@ -147,6 +166,7 @@ class LoanDetailViewModel @Inject constructor(
             ),
             nextPayment = next,
             settlements = settlements,
+            rates = withSchedule.rates,
             todayEpochDay = date.toEpochDay(),
             canMarkPaid = next != null && !next.date.isAfter(date) &&
                 loan.accountId != null && loan.categoryId != null,
@@ -202,6 +222,43 @@ class LoanDetailViewModel @Inject constructor(
 
     fun onRefresh() {
         today.value = LocalDate.now()
+    }
+
+    /** Null while the rate dialog is closed. */
+    private val _rateDialog = MutableStateFlow<RateDialogState?>(null)
+    val rateDialog: StateFlow<RateDialogState?> = _rateDialog.asStateFlow()
+
+    fun onAddRateClick() {
+        _rateDialog.value = RateDialogState(
+            // Defaults to the next payment date: a bank's rate step lands on a payment
+            // boundary far more often than mid-period.
+            dateEpochDay = (uiState.value.nextPayment?.date ?: LocalDate.now()).toEpochDay(),
+        )
+    }
+
+    fun onRateDialogRateChange(text: String) = _rateDialog.update {
+        it?.copy(rateText = sanitizeRateInput(text))
+    }
+
+    fun onRateDialogDateChange(epochDay: Long) = _rateDialog.update {
+        it?.copy(dateEpochDay = epochDay)
+    }
+
+    fun onRateDialogDismiss() {
+        _rateDialog.value = null
+    }
+
+    fun onRateDialogConfirm() {
+        val dialog = _rateDialog.value ?: return
+        if (!dialog.canSave) return
+        _rateDialog.value = null
+        viewModelScope.launch {
+            loanRepository.addRateChange(loanId, dialog.rateMilliPercent, dialog.dateEpochDay)
+        }
+    }
+
+    fun onDeleteRate(id: String) {
+        viewModelScope.launch { loanRepository.deleteRateChange(id) }
     }
 
     fun onAddPrepaymentClick() {
