@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import com.findev.fintrack.notification.LoanReminderScheduler
 import com.findev.fintrack.notification.MeterReminderScheduler
 import com.findev.fintrack.notification.PaymentReminderScheduler
+import com.findev.fintrack.update.UpdateCheckScheduler
 import com.findev.fintrack.widget.WidgetUpdater
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +32,9 @@ class FinTrackApplication : Application(), Configuration.Provider {
     @Inject
     lateinit var widgetUpdater: WidgetUpdater
 
+    @Inject
+    lateinit var updateCheckScheduler: UpdateCheckScheduler
+
     /** Lives as long as the process. The alarms it sets outlive it. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -50,6 +54,9 @@ class FinTrackApplication : Application(), Configuration.Provider {
 
         loanReminderScheduler.createChannel()
         loanReminderScheduler.observeLoans(scope)
+
+        updateCheckScheduler.createChannel()
+        updateCheckScheduler.schedule()
 
         widgetUpdater.observe(scope)
     }

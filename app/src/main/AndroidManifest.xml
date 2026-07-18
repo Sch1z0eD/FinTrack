@@ -12,6 +12,14 @@
          for FinTrack from the in-app settings screen. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- The app stores nothing off-device and talks to no server. The only outbound request
+         is the GitHub release check, and it runs when the user asks for it or when they have
+         switched the daily check on - never otherwise. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Needed to hand a downloaded APK to the package installer: this app updates itself
+         from GitHub Releases rather than through a store. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:name=".FinTrackApplication"
         android:allowBackup="true"
@@ -70,6 +78,26 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/next_payment_widget_info" />
         </receiver>
+
+        <receiver
+            android:name=".update.UpdateDownloadReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Grants the package installer read access to the downloaded APK; it runs in
+             another process and cannot open our files directly. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- On-demand WorkManager: the app provides its own Configuration (with the Hilt
              worker factory) from FinTrackApplication, so the default startup initializer

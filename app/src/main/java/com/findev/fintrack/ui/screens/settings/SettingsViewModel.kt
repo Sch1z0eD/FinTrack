@@ -10,8 +10,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.findev.fintrack.data.AvailableUpdate
+import com.findev.fintrack.data.NoReleasesYetException
 import com.findev.fintrack.data.SettingsRepository
 import com.findev.fintrack.data.ThemeMode
+import com.findev.fintrack.data.UpdateRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,10 +36,22 @@ data class SettingsUiState(
     val batteryUnrestricted: Boolean = true,
 )
 
+/** Where the update check has got to. */
+sealed interface UpdateUiState {
+    data object Idle : UpdateUiState
+    data object Checking : UpdateUiState
+    data object UpToDate : UpdateUiState
+    data object NoReleases : UpdateUiState
+    data class Available(val update: AvailableUpdate) : UpdateUiState
+    data class Downloading(val update: AvailableUpdate) : UpdateUiState
+    data class Failed(val reason: String) : UpdateUiState
+}
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
+    private val updateRepository: UpdateRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -45,6 +60,14 @@ class SettingsViewModel @Inject constructor(
     val themeMode: StateFlow<ThemeMode> = settingsRepository.themeMode
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.SYSTEM)
 
+    val autoUpdateCheck: StateFlow<Boolean> = settingsRepository.autoUpdateCheck
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    private val _updateState = MutableStateFlow<UpdateUiState>(UpdateUiState.Idle)
+    val updateState: StateFlow<UpdateUiState> = _updateState.asStateFlow()
+
+    val installedVersionName: String get() = updateRepository.installedVersionName
+
     init {
         refresh()
     }
@@ -52,6 +75,43 @@ class SettingsViewModel @Inject constructor(
     fun onThemeModeChange(mode: ThemeMode) {
         viewModelScope.launch { settingsRepository.setThemeMode(mode) }
     }
+
+    fun onAutoUpdateCheckChange(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.setAutoUpdateCheck(enabled) }
+    }
+
+    fun onCheckForUpdates() {
+        if (_updateState.value is UpdateUiState.Checking) return
+        _updateState.value = UpdateUiState.Checking
+
+        viewModelScope.launch {
+            _updateState.value = updateRepository.fetchLatest().fold(
+                onSuccess = { update ->
+                    if (update == null) {
+                        UpdateUiState.UpToDate
+                    } else {
+                        UpdateUiState.Available(update)
+                    }
+                },
+                onFailure = { error ->
+                    if (error is NoReleasesYetException) {
+                        UpdateUiState.NoReleases
+                    } else {
+                        UpdateUiState.Failed(error.message.orEmpty())
+                    }
+                },
+            )
+        }
+    }
+
+    fun onDownloadUpdate(update: AvailableUpdate) {
+        // The system downloader takes it from here and reports through its own notification;
+        // UpdateDownloadReceiver posts the "install" one when the file lands.
+        updateRepository.downloadApk(update)
+        _updateState.value = UpdateUiState.Downloading(update)
+    }
+
+    fun canInstallPackages(): Boolean = updateRepository.canInstallPackages()
 
     /** Called on resume: the user may have flipped any of these in system settings. */
     fun refresh() {

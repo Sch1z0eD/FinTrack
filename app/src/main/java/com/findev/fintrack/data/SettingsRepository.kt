@@ -2,6 +2,7 @@ package com.findev.fintrack.data
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,7 @@ enum class ThemeMode {
 }
 
 private val THEME_MODE = stringPreferencesKey("theme_mode")
+private val AUTO_UPDATE_CHECK = booleanPreferencesKey("auto_update_check")
 
 /** App preferences that are not domain data and never sync. */
 @Singleton
@@ -32,5 +34,17 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setThemeMode(mode: ThemeMode) {
         dataStore.edit { prefs -> prefs[THEME_MODE] = mode.name }
+    }
+
+    /**
+     * Off until asked for. This is the app's only network call, and turning it on by default
+     * would put an offline-first app on the network without the user ever saying so.
+     */
+    val autoUpdateCheck: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[AUTO_UPDATE_CHECK] ?: false
+    }
+
+    suspend fun setAutoUpdateCheck(enabled: Boolean) {
+        dataStore.edit { prefs -> prefs[AUTO_UPDATE_CHECK] = enabled }
     }
 }

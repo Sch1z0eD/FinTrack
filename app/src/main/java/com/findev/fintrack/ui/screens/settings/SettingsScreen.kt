@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,6 +30,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -38,12 +40,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
+import com.findev.fintrack.data.AvailableUpdate
+import com.findev.fintrack.data.RELEASES_PAGE_URL
 import com.findev.fintrack.data.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +59,8 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val autoUpdateCheck by viewModel.autoUpdateCheck.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     // Every one of these can be changed from system settings while we are backgrounded, so the
@@ -114,6 +121,27 @@ fun SettingsScreen(
             }
 
             item {
+                AboutCard(
+                    versionName = viewModel.installedVersionName,
+                    updateState = updateState,
+                    autoCheckEnabled = autoUpdateCheck,
+                    canInstall = viewModel.canInstallPackages(),
+                    onCheck = viewModel::onCheckForUpdates,
+                    onDownload = viewModel::onDownloadUpdate,
+                    onAutoCheckChange = viewModel::onAutoUpdateCheckChange,
+                    onOpenGithub = { context.startActivitySafely(Intent(Intent.ACTION_VIEW, RELEASES_PAGE_URL.toUri())) },
+                    onGrantInstall = {
+                        context.startActivitySafely(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                "package:${context.packageName}".toUri(),
+                            ),
+                        )
+                    },
+                )
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.settings_permissions_intro),
                     style = MaterialTheme.typography.bodyMedium,
@@ -164,6 +192,141 @@ fun SettingsScreen(
                         )
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutCard(
+    versionName: String,
+    updateState: UpdateUiState,
+    autoCheckEnabled: Boolean,
+    canInstall: Boolean,
+    onCheck: () -> Unit,
+    onDownload: (AvailableUpdate) -> Unit,
+    onAutoCheckChange: (Boolean) -> Unit,
+    onOpenGithub: () -> Unit,
+    onGrantInstall: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_about_title),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = stringResource(R.string.settings_version, versionName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            when (updateState) {
+                UpdateUiState.Idle -> Unit
+
+                UpdateUiState.Checking -> Text(
+                    text = stringResource(R.string.settings_checking),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                UpdateUiState.UpToDate -> Text(
+                    text = stringResource(R.string.settings_up_to_date),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+
+                UpdateUiState.NoReleases -> Text(
+                    text = stringResource(R.string.settings_no_releases),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                is UpdateUiState.Failed -> Text(
+                    text = stringResource(R.string.settings_update_failed, updateState.reason),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+
+                is UpdateUiState.Downloading -> Text(
+                    text = stringResource(R.string.settings_update_downloading),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                is UpdateUiState.Available -> {
+                    Text(
+                        text = stringResource(
+                            R.string.settings_update_found,
+                            updateState.update.versionName,
+                        ),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (updateState.update.notes.isNotBlank()) {
+                        Text(
+                            text = updateState.update.notes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Without this the installer opens and immediately refuses; better to say
+                    // so before the download than after it.
+                    if (!canInstall) {
+                        Text(
+                            text = stringResource(R.string.settings_install_permission),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        TextButton(onClick = onGrantInstall) {
+                            Text(stringResource(R.string.settings_allow))
+                        }
+                    }
+                    Button(onClick = { onDownload(updateState.update) }) {
+                        Text(stringResource(R.string.settings_update_download))
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_auto_update),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_auto_update_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = autoCheckEnabled, onCheckedChange = onAutoCheckChange)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onOpenGithub) {
+                    Text(stringResource(R.string.settings_open_github))
+                }
+                TextButton(
+                    onClick = onCheck,
+                    enabled = updateState !is UpdateUiState.Checking,
+                ) {
+                    Text(stringResource(R.string.settings_check_updates))
+                }
             }
         }
     }
