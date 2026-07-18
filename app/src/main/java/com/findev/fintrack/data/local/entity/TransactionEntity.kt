@@ -72,6 +72,22 @@ data class TransactionEntity(
     @ColumnInfo(name = "settles_due_epoch_day")
     val settlesDueEpochDay: Long? = null,
 
+    /**
+     * A part payment: real money against this occurrence that does not close it.
+     *
+     * Without this, paying 100 ₽ against a 6 696 ₽ instalment marked the whole month
+     * settled - the paid-through query only ever asked whether a settling row existed, not
+     * how much it was for. Amount alone cannot decide it either: a final instalment is
+     * legitimately smaller than the rest, and a bank can accept less by arrangement. So the
+     * user says which it was, and the query counts only the rows that closed something.
+     */
+    // The default is declared here as well as in the migration on purpose. ALTER TABLE ADD
+    // COLUMN cannot add a NOT NULL column without one, so the database will have a default
+    // whatever happens; saying so here keeps the exported schema and the real table
+    // identical instead of relying on Room being lenient about the difference.
+    @ColumnInfo(name = "settles_partial", defaultValue = "0")
+    val settlesPartial: Boolean = false,
+
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 

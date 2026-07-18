@@ -17,12 +17,17 @@ import javax.inject.Inject
 data class MonthlyObligations(
     val loansMinor: Long = 0,
     val recurringMinor: Long = 0,
+    /** Money that actually left the accounts towards this month's obligations. */
     val paidMinor: Long = 0,
+    /**
+     * Scheduled amount of the occurrences still open.
+     *
+     * Stored rather than derived as total minus paid: an occurrence settled for less than
+     * its nominal is closed, so subtracting would keep insisting on money nobody owes.
+     */
+    val remainingMinor: Long = 0,
 ) {
     val totalMinor: Long get() = loansMinor + recurringMinor
-
-    /** Never negative: paying more than the nominal (a bigger utility bill) is not a credit. */
-    val remainingMinor: Long get() = (totalMinor - paidMinor).coerceAtLeast(0)
 }
 
 /**
@@ -38,36 +43,67 @@ class ObligationsRepository @Inject constructor(
         loanRepository.observeAllWithSchedules(),
         recurringPaymentRepository.observeAll(),
         transactionRepository.observePaidThrough(),
-    ) { loans, recurring, paidThrough ->
-        monthlyObligations(loans, recurring, paidThrough, month)
+        transactionRepository.observeSettledAmounts(),
+    ) { loans, recurring, paidThrough, paidAmounts ->
+        monthlyObligations(loans, recurring, paidThrough, paidAmounts, month)
     }
 }
 
 /**
+ * What an occurrence actually cost this month.
+ *
+ * Once it is closed, the money that settled it *is* the obligation: agreeing 5 000 ₽ for a
+ * 10 000 ₽ bill means the month's burden was 5 000 ₽, not 10 000 ₽ with half of it
+ * forgiven and still displayed. While it is open the scheduled amount stands, because that
+ * is what is still going to be asked for.
+ *
+ * A closed occurrence with nothing booked against it fell to a payment made ahead, which
+ * is attached to the last occurrence it covered; the scheduled amount is the honest figure
+ * for the ones it settled by implication.
+ */
+private fun effectiveAmount(scheduledMinor: Long, paidMinor: Long, closed: Boolean): Long =
+    if (closed && paidMinor > 0) paidMinor else scheduledMinor
+
+/**
  * Sums the obligations due within [month] (inclusive epoch-day bounds).
  *
- * An occurrence counts as paid when its due date is not after the payment's paid-through
- * mark, which is the same rule the Payments screen uses - so the two can never disagree.
+ * Two different questions, deliberately answered from two different places:
+ *
+ *  - **How much money went out** ([MonthlyObligations.paidMinor]) is counted from the
+ *    transactions themselves. It used to credit the *scheduled* amount whenever an
+ *    occurrence was marked closed, so settling a 10 000 ₽ obligation with 3 800 ₽ - which
+ *    the dialog allows, and banks do accept - reported 10 000 ₽ paid while only 3 800 ₽
+ *    had left the account.
+ *  - **How much is still owed** ([MonthlyObligations.remainingMinor]) is the scheduled
+ *    amount of the occurrences that are still open. It cannot be total minus paid: an
+ *    occurrence settled for less than its nominal is closed, and nothing more is due on it.
+ *
+ * The total follows the same rule through [effectiveAmount], so a settled month adds up:
+ * pay 5 000 ₽ against a 10 000 ₽ bill and call it settled, and the month reads 5 000 ₽ of
+ * 5 000 ₽ rather than 5 000 ₽ of 10 000 ₽ with nothing outstanding.
  */
 fun monthlyObligations(
     loans: List<LoanWithSchedule>,
     recurring: List<RecurringPaymentEntity>,
     paidThrough: Map<String, Long>,
+    paidAmounts: Map<Pair<String, Long>, Long>,
     month: LongRange,
 ): MonthlyObligations {
     var loansMinor = 0L
     var recurringMinor = 0L
     var paidMinor = 0L
+    var remainingMinor = 0L
 
     loans.forEach { lws ->
         val paidThroughDay = paidThrough[lws.loan.id]
         lws.schedule.forEach { entry ->
             val day = entry.date.toEpochDay()
             if (day in month) {
-                loansMinor += entry.paymentMinor
-                if (paidThroughDay != null && day <= paidThroughDay) {
-                    paidMinor += entry.paymentMinor
-                }
+                val paid = paidAmounts[lws.loan.id to day] ?: 0
+                val closed = paidThroughDay != null && day <= paidThroughDay
+                loansMinor += effectiveAmount(entry.paymentMinor, paid, closed)
+                paidMinor += paid
+                if (!closed) remainingMinor += entry.paymentMinor
             }
         }
     }
@@ -75,10 +111,11 @@ fun monthlyObligations(
     recurring.forEach { payment ->
         val paidThroughDay = paidThrough[payment.id]
         recurrenceDaysIn(payment, month).forEach { day ->
-            recurringMinor += payment.amountMinor
-            if (paidThroughDay != null && day <= paidThroughDay) {
-                paidMinor += payment.amountMinor
-            }
+            val paid = paidAmounts[payment.id to day] ?: 0
+            val closed = paidThroughDay != null && day <= paidThroughDay
+            recurringMinor += effectiveAmount(payment.amountMinor, paid, closed)
+            paidMinor += paid
+            if (!closed) remainingMinor += payment.amountMinor
         }
     }
 
@@ -86,6 +123,7 @@ fun monthlyObligations(
         loansMinor = loansMinor,
         recurringMinor = recurringMinor,
         paidMinor = paidMinor,
+        remainingMinor = remainingMinor,
     )
 }
 

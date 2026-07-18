@@ -24,17 +24,18 @@ import com.findev.fintrack.loanengine.PrepaymentMode as EnginePrepaymentMode
 fun LoanEntity.toEngineLoan(): EngineLoan = EngineLoan(
     type = type.toEngine(),
     principalMinor = principalMinor,
-    annualRateBp = rateBp,
+    annualRateMilliPercent = rateMilliPercent,
     startDate = LocalDate.ofEpochDay(startDateEpochDay),
     termMonths = termMonths,
     paymentDay = paymentDay,
     upfrontFeeMinor = upfrontFeeMinor,
     monthlyFeeMinor = monthlyFeeMinor,
+    fixedPaymentMinor = fixedPaymentMinor,
 )
 
 fun LoanRateEntity.toRateChange(): RateChange = RateChange(
     effectiveFrom = LocalDate.ofEpochDay(effectiveFromEpochDay),
-    annualRateBp = rateBp,
+    annualRateMilliPercent = rateMilliPercent,
 )
 
 fun LoanPrepaymentEntity.toPrepayment(): Prepayment = Prepayment(

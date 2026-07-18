@@ -43,7 +43,7 @@ import com.findev.fintrack.data.local.entity.TransactionEntity
         MeterGroupEntity::class,
         RecurringPaymentEntity::class,
     ],
-    version = 1,
+    version = 4,
     exportSchema = true,
 )
 abstract class FinTrackDatabase : RoomDatabase() {

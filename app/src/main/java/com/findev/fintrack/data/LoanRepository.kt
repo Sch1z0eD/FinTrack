@@ -4,6 +4,7 @@ import com.findev.fintrack.data.local.dao.LoanDao
 import com.findev.fintrack.data.local.dao.LoanPrepaymentDao
 import com.findev.fintrack.data.local.dao.LoanRateDao
 import com.findev.fintrack.data.local.entity.LoanEntity
+import com.findev.fintrack.data.local.entity.reminderDaysToStored
 import com.findev.fintrack.data.local.entity.LoanPrepaymentEntity
 import com.findev.fintrack.data.local.entity.LoanRateEntity
 import com.findev.fintrack.data.local.entity.LoanType
@@ -92,7 +93,7 @@ class LoanRepository @Inject constructor(
         name: String,
         type: LoanType,
         principalMinor: Long,
-        rateBp: Int,
+        rateMilliPercent: Int,
         startDateEpochDay: Long,
         termMonths: Int,
         paymentDay: Int,
@@ -100,7 +101,9 @@ class LoanRepository @Inject constructor(
         monthlyFeeMinor: Long,
         accountId: String?,
         categoryId: String?,
-        reminderDaysBefore: Int?,
+        reminderDays: List<Int>,
+        fixedPaymentMinor: Long?,
+        allowedPrepaymentMode: PrepaymentMode?,
     ): String {
         val id = UUID.randomUUID().toString()
         loanDao.insert(
@@ -109,7 +112,7 @@ class LoanRepository @Inject constructor(
                 name = name,
                 type = type,
                 principalMinor = principalMinor,
-                rateBp = rateBp,
+                rateMilliPercent = rateMilliPercent,
                 startDateEpochDay = startDateEpochDay,
                 termMonths = termMonths,
                 paymentDay = paymentDay,
@@ -117,7 +120,9 @@ class LoanRepository @Inject constructor(
                 monthlyFeeMinor = monthlyFeeMinor,
                 accountId = accountId,
                 categoryId = categoryId,
-                reminderDaysBefore = reminderDaysBefore,
+                reminderDays = reminderDaysToStored(reminderDays),
+                fixedPaymentMinor = fixedPaymentMinor,
+                allowedPrepaymentMode = allowedPrepaymentMode,
                 updatedAt = System.currentTimeMillis(),
             ),
         )
@@ -129,7 +134,7 @@ class LoanRepository @Inject constructor(
         name: String,
         type: LoanType,
         principalMinor: Long,
-        rateBp: Int,
+        rateMilliPercent: Int,
         startDateEpochDay: Long,
         termMonths: Int,
         paymentDay: Int,
@@ -137,7 +142,9 @@ class LoanRepository @Inject constructor(
         monthlyFeeMinor: Long,
         accountId: String?,
         categoryId: String?,
-        reminderDaysBefore: Int?,
+        reminderDays: List<Int>,
+        fixedPaymentMinor: Long?,
+        allowedPrepaymentMode: PrepaymentMode?,
     ) {
         val existing = requireNotNull(loanDao.getById(id)) { "No loan with id $id" }
         loanDao.update(
@@ -145,7 +152,7 @@ class LoanRepository @Inject constructor(
                 name = name,
                 type = type,
                 principalMinor = principalMinor,
-                rateBp = rateBp,
+                rateMilliPercent = rateMilliPercent,
                 startDateEpochDay = startDateEpochDay,
                 termMonths = termMonths,
                 paymentDay = paymentDay,
@@ -153,7 +160,9 @@ class LoanRepository @Inject constructor(
                 monthlyFeeMinor = monthlyFeeMinor,
                 accountId = accountId,
                 categoryId = categoryId,
-                reminderDaysBefore = reminderDaysBefore,
+                reminderDays = reminderDaysToStored(reminderDays),
+                fixedPaymentMinor = fixedPaymentMinor,
+                allowedPrepaymentMode = allowedPrepaymentMode,
                 updatedAt = System.currentTimeMillis(),
             ),
         )

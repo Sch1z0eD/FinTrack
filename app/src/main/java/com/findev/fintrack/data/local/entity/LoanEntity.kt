@@ -23,12 +23,15 @@ data class LoanEntity(
     val principalMinor: Long,
 
     /**
-     * Initial annual rate in basis points (1 bp = 0.01%), so 16.9% is 1690.
+     * Initial annual rate in thousandths of a percent, so 16.9% is 16900.
      * Integer keeps floating point out of the interest math; later changes live in loan_rate.
      * INSTALLMENT loans use 0.
+     *
+     * Basis points (0.01%) came first and were not enough: contracts quote three decimals,
+     * and 28.572% is not a whole number of them.
      */
-    @ColumnInfo(name = "rate_bp")
-    val rateBp: Int,
+    @ColumnInfo(name = "rate_milli_percent")
+    val rateMilliPercent: Int,
 
     @ColumnInfo(name = "start_date_epoch_day")
     val startDateEpochDay: Long,
@@ -60,16 +63,53 @@ data class LoanEntity(
     val categoryId: String? = null,
 
     /**
-     * Days before the payment date to remind, or null for no reminder. 0 means on the day.
-     * Unlike recurring payments (a single on-the-day flag), a loan instalment is worth a
-     * heads-up so the money can be moved in time, and how many days is the user's call.
+     * Lead times to remind at, comma separated, or null for no reminder. "7,1" is a week
+     * ahead and again the day before; "0" is on the day itself.
+     *
+     * A single Int was not enough: one warning is either too early to act on or too late to
+     * move money. A child table would be the textbook answer, but this is a handful of small
+     * numbers that are always read and written together with the loan, and never queried on
+     * their own - a join for that would cost more than it explains. Parsed by
+     * [reminderDaysList].
      */
-    @ColumnInfo(name = "reminder_days_before")
-    val reminderDaysBefore: Int? = null,
+    @ColumnInfo(name = "reminder_days")
+    val reminderDays: String? = null,
+
+    /**
+     * Payment size copied from the contract, or null to derive it from the rate.
+     *
+     * See com.findev.fintrack.loanengine.Loan.fixedPaymentMinor: some contracts publish a
+     * level payment the annuity formula cannot reproduce.
+     */
+    @ColumnInfo(name = "fixed_payment_minor")
+    val fixedPaymentMinor: Long? = null,
+
+    /**
+     * The one prepayment mode the contract allows, or null when the bank offers both.
+     *
+     * Not a preference - a term. A contract reading «уменьшение суммы платежей при
+     * сохранении дат» simply will not shorten the term, so offering that choice would
+     * show the user a schedule the bank is never going to produce.
+     */
+    @ColumnInfo(name = "allowed_prepayment_mode")
+    val allowedPrepaymentMode: PrepaymentMode? = null,
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 
     @ColumnInfo(name = "is_deleted")
     val isDeleted: Boolean = false,
-)
+) {
+    /** Lead times, sorted furthest-out first, empty when reminders are off. */
+    val reminderDaysList: List<Int>
+        get() = reminderDays
+            ?.split(',')
+            ?.mapNotNull { it.trim().toIntOrNull() }
+            ?.distinct()
+            ?.sortedDescending()
+            .orEmpty()
+}
+
+/** Renders lead times back into the stored form; empty means "no reminder". */
+fun reminderDaysToStored(days: List<Int>): String? =
+    days.distinct().sortedDescending().joinToString(",").takeIf { it.isNotEmpty() }

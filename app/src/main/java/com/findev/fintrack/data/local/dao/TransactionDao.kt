@@ -17,8 +17,60 @@ data class PaidThrough(
     @ColumnInfo(name = "paid_through_epoch_day") val paidThroughEpochDay: Long,
 )
 
+/** Money actually paid against one occurrence, whether or not it closed it. */
+data class SettledAmount(
+    @ColumnInfo(name = "settles_payment_id") val paymentId: String,
+    @ColumnInfo(name = "settles_due_epoch_day") val dueEpochDay: Long,
+    @ColumnInfo(name = "paid_minor") val paidMinor: Long,
+)
+
+/** One booked payment against an obligation, for the history sheet. */
+data class SettlementRow(
+    @ColumnInfo(name = "id") val id: String,
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    @ColumnInfo(name = "date_epoch_day") val dateEpochDay: Long,
+    @ColumnInfo(name = "settles_due_epoch_day") val dueEpochDay: Long,
+    @ColumnInfo(name = "settles_partial") val isPartial: Boolean,
+)
+
 @Dao
 interface TransactionDao {
+
+    /**
+     * Everything ever paid against one obligation, newest first.
+     *
+     * Ordered by the day the money moved rather than the due date it covered: the question
+     * this answers is "when did I pay, and how much", and a late payment belongs where it
+     * actually happened.
+     */
+    @Query(
+        "SELECT id, amount_minor, date_epoch_day, settles_due_epoch_day, settles_partial " +
+            "FROM transactions " +
+            "WHERE is_deleted = 0 AND settles_payment_id = :paymentId " +
+            "AND settles_due_epoch_day IS NOT NULL " +
+            "ORDER BY date_epoch_day DESC, updated_at DESC",
+    )
+    fun observeSettlements(paymentId: String): Flow<List<SettlementRow>>
+
+    /**
+     * Money paid per occurrence - every settling row, part payment or not.
+     *
+     * Grouped by due date as well as payment: two ₽500 instalments against March are ₽1000
+     * towards March and say nothing about April.
+     *
+     * This is what actually left the account, which is not the same as what was owed. A
+     * utility bill differs from its nominal every month, and a payment can be settled for
+     * less by arrangement - so "оплачено" has to be counted from here rather than from the
+     * scheduled amount of whatever is marked closed.
+     */
+    @Query(
+        "SELECT settles_payment_id, settles_due_epoch_day, SUM(amount_minor) AS paid_minor " +
+            "FROM transactions " +
+            "WHERE is_deleted = 0 " +
+            "AND settles_payment_id IS NOT NULL AND settles_due_epoch_day IS NOT NULL " +
+            "GROUP BY settles_payment_id, settles_due_epoch_day",
+    )
+    fun observeSettledAmounts(): Flow<List<SettledAmount>>
 
     /**
      * Settlements for every payment at once, derived from live transactions only.
@@ -30,7 +82,7 @@ interface TransactionDao {
         "SELECT settles_payment_id, MAX(settles_due_epoch_day) AS paid_through_epoch_day " +
             "FROM transactions " +
             "WHERE is_deleted = 0 AND settles_payment_id IS NOT NULL " +
-            "AND settles_due_epoch_day IS NOT NULL " +
+            "AND settles_due_epoch_day IS NOT NULL AND settles_partial = 0 " +
             "GROUP BY settles_payment_id",
     )
     fun observePaidThrough(): Flow<List<PaidThrough>>
@@ -40,7 +92,7 @@ interface TransactionDao {
         "SELECT settles_payment_id, MAX(settles_due_epoch_day) AS paid_through_epoch_day " +
             "FROM transactions " +
             "WHERE is_deleted = 0 AND settles_payment_id IS NOT NULL " +
-            "AND settles_due_epoch_day IS NOT NULL " +
+            "AND settles_due_epoch_day IS NOT NULL AND settles_partial = 0 " +
             "GROUP BY settles_payment_id",
     )
     suspend fun getPaidThrough(): List<PaidThrough>
@@ -68,7 +120,8 @@ interface TransactionDao {
                c.name AS category_name,
                c.icon AS category_icon,
                c.color AS category_color,
-               a.name AS account_name
+               a.name AS account_name,
+               t.settles_partial AS settles_partial
         FROM transactions t
         JOIN account a ON a.id = t.account_id
         LEFT JOIN category c ON c.id = t.category_id

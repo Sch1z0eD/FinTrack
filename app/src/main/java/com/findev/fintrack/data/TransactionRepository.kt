@@ -3,6 +3,7 @@ package com.findev.fintrack.data
 import com.findev.fintrack.data.local.CategoryTotal
 import com.findev.fintrack.data.local.MonthlyTotal
 import com.findev.fintrack.data.local.TransactionListItem
+import com.findev.fintrack.data.local.dao.SettlementRow
 import com.findev.fintrack.data.local.dao.TransactionDao
 import com.findev.fintrack.data.local.entity.TransactionEntity
 import com.findev.fintrack.data.local.entity.TransactionType
@@ -93,6 +94,8 @@ class TransactionRepository @Inject constructor(
         /** Set when this expense settles a loan or recurring payment. */
         settlesPaymentId: String? = null,
         settlesDueEpochDay: Long? = null,
+        /** Part payment: recorded against the occurrence without closing it. */
+        settlesPartial: Boolean = false,
     ): String {
         require(type != TransactionType.TRANSFER) { "Use a transfer-specific API for TRANSFER" }
         require(amountMinor > 0) { "Amount must be positive, was $amountMinor" }
@@ -112,10 +115,81 @@ class TransactionRepository @Inject constructor(
                 note = note,
                 settlesPaymentId = settlesPaymentId,
                 settlesDueEpochDay = settlesDueEpochDay,
+                settlesPartial = settlesPartial,
                 updatedAt = System.currentTimeMillis(),
             ),
         )
         return id
+    }
+
+    /**
+     * Moves money between two of the user's own accounts.
+     *
+     * One row, not two. A transfer is a single event with a source and a destination, and
+     * booking it as an expense plus an income would count it in both "расходы за месяц" and
+     * "доходы за месяц" - inflating each by money that never left the user's pockets, and
+     * poisoning every category statistic downstream. That is exactly what the app forced
+     * until now: the schema had TRANSFER and account_to_id from the start, the feed could
+     * render them, and nothing could create one.
+     *
+     * No category: a transfer is not spending, so it belongs in none of them.
+     */
+    suspend fun addTransfer(
+        amountMinor: Long,
+        fromAccountId: String,
+        toAccountId: String,
+        dateEpochDay: Long,
+        note: String? = null,
+    ): String {
+        require(amountMinor > 0) { "Amount must be positive, was $amountMinor" }
+        require(fromAccountId != toAccountId) {
+            "A transfer needs two different accounts, both were $fromAccountId"
+        }
+
+        val id = UUID.randomUUID().toString()
+        transactionDao.insert(
+            TransactionEntity(
+                id = id,
+                type = TransactionType.TRANSFER,
+                amountMinor = amountMinor,
+                accountId = fromAccountId,
+                accountToId = toAccountId,
+                categoryId = null,
+                dateEpochDay = dateEpochDay,
+                note = note,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
+        return id
+    }
+
+    /** Changes an existing transfer, keeping it a transfer. */
+    suspend fun updateTransfer(
+        id: String,
+        amountMinor: Long,
+        fromAccountId: String,
+        toAccountId: String,
+        dateEpochDay: Long,
+        note: String? = null,
+    ) {
+        require(amountMinor > 0) { "Amount must be positive, was $amountMinor" }
+        require(fromAccountId != toAccountId) {
+            "A transfer needs two different accounts, both were $fromAccountId"
+        }
+
+        val existing = requireNotNull(transactionDao.getById(id)) { "No transaction with id $id" }
+        transactionDao.update(
+            existing.copy(
+                type = TransactionType.TRANSFER,
+                amountMinor = amountMinor,
+                accountId = fromAccountId,
+                accountToId = toAccountId,
+                categoryId = null,
+                dateEpochDay = dateEpochDay,
+                note = note,
+                updatedAt = System.currentTimeMillis(),
+            ),
+        )
     }
 
     /** Latest settled due date per payment, derived from live transactions. */
@@ -126,4 +200,19 @@ class TransactionRepository @Inject constructor(
 
     suspend fun getPaidThrough(): Map<String, Long> =
         transactionDao.getPaidThrough().associate { it.paymentId to it.paidThroughEpochDay }
+
+    /** Everything ever paid against one obligation, newest first. */
+    fun observeSettlements(paymentId: String): Flow<List<SettlementRow>> =
+        transactionDao.observeSettlements(paymentId)
+
+    /**
+     * Money actually paid per occurrence, keyed by payment id and due date.
+     *
+     * Keyed by the pair because a payment belongs to one occurrence: money put against
+     * March must not make April look started.
+     */
+    fun observeSettledAmounts(): Flow<Map<Pair<String, Long>, Long>> =
+        transactionDao.observeSettledAmounts().map { rows ->
+            rows.associate { (it.paymentId to it.dueEpochDay) to it.paidMinor }
+        }
 }

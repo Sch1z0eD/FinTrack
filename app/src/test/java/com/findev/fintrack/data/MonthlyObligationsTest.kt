@@ -25,7 +25,7 @@ class MonthlyObligationsTest {
             ),
         )
 
-        val result = monthlyObligations(listOf(loan), emptyList(), emptyMap(), july)
+        val result = monthlyObligations(listOf(loan), emptyList(), emptyMap(), emptyMap(), july)
 
         assertEquals(1_000L, result.loansMinor)
         assertEquals(1_000L, result.totalMinor)
@@ -40,7 +40,7 @@ class MonthlyObligationsTest {
             period = RecurrencePeriod.MONTH,
         )
 
-        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), july)
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), emptyMap(), july)
 
         assertEquals(80_000L, result.recurringMinor)
     }
@@ -54,7 +54,7 @@ class MonthlyObligationsTest {
             period = RecurrencePeriod.DAY,
         )
 
-        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), july)
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), emptyMap(), july)
 
         assertEquals(31 * 100L, result.recurringMinor)
     }
@@ -68,7 +68,7 @@ class MonthlyObligationsTest {
             period = RecurrencePeriod.YEAR,
         )
 
-        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), july)
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), emptyMap(), july)
 
         assertEquals(0L, result.recurringMinor)
     }
@@ -83,7 +83,7 @@ class MonthlyObligationsTest {
             end = LocalDate.of(2026, 6, 20),
         )
 
-        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), july)
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), emptyMap(), july)
 
         assertEquals(0L, result.recurringMinor)
     }
@@ -101,12 +101,101 @@ class MonthlyObligationsTest {
             dates = listOf(LocalDate.of(2026, 7, 25) to 1_000L),
         )
 
-        val paidThrough = mapOf("net" to LocalDate.of(2026, 7, 5).toEpochDay())
-        val result = monthlyObligations(listOf(loan), listOf(payment), paidThrough, july)
+        val due = LocalDate.of(2026, 7, 5).toEpochDay()
+        val paidThrough = mapOf("net" to due)
+        // Paid counts the money that actually moved, so the transaction has to be there.
+        val paidAmounts = mapOf(("net" to due) to 80_000L)
+        val result = monthlyObligations(listOf(loan), listOf(payment), paidThrough, paidAmounts, july)
 
         assertEquals(81_000L, result.totalMinor)
         assertEquals(80_000L, result.paidMinor)
+        // Only the loan instalment is still open.
         assertEquals(1_000L, result.remainingMinor)
+    }
+
+    /**
+     * The bug this guards: "оплачено" was decided purely by a settling row existing, so
+     * paying 500 against an 80 000 bill closed the whole month.
+     */
+    @Test
+    fun `a part payment counts towards the month without closing the occurrence`() {
+        val payment = recurring(
+            id = "net",
+            amountMinor = 80_000,
+            start = LocalDate.of(2026, 7, 5),
+            period = RecurrencePeriod.MONTH,
+        )
+        val paid = mapOf(("net" to LocalDate.of(2026, 7, 5).toEpochDay()) to 500L)
+
+        // Nothing is paid *through*: the occurrence is still open, so the whole nominal
+        // is still owed even though 500 has gone out.
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), paid, july)
+
+        assertEquals(80_000L, result.totalMinor)
+        assertEquals(500L, result.paidMinor)
+        assertEquals(80_000L, result.remainingMinor)
+    }
+
+    /**
+     * Settling for less than the nominal, which the pay dialog allows and banks do accept.
+     *
+     * All three figures agree on 3 800: that is what left the account, and once the month
+     * is closed for less, 3 800 *is* what the month cost. Two earlier versions of this got
+     * it wrong in opposite directions - one credited the scheduled 10 000 as paid, the next
+     * reported "3 800 of 10 000 paid, 0 remaining", which reads as a contradiction.
+     */
+    @Test
+    fun `an occurrence settled for less becomes the month's actual burden`() {
+        val payment = recurring(
+            id = "net",
+            amountMinor = 10_000,
+            start = LocalDate.of(2026, 7, 5),
+            period = RecurrencePeriod.MONTH,
+        )
+        val due = LocalDate.of(2026, 7, 5).toEpochDay()
+
+        val result = monthlyObligations(
+            emptyList(),
+            listOf(payment),
+            mapOf("net" to due),
+            mapOf(("net" to due) to 3_800L),
+            july,
+        )
+
+        assertEquals(3_800L, result.totalMinor)
+        assertEquals(3_800L, result.paidMinor)
+        assertEquals(0L, result.remainingMinor)
+    }
+
+    /**
+     * A payment made ahead is booked against the last occurrence it covers, so the ones it
+     * settled by implication have nothing of their own. Their scheduled amount has to stand,
+     * or they would silently count as costing nothing.
+     */
+    @Test
+    fun `an occurrence settled by implication keeps its scheduled amount`() {
+        val payment = recurring(
+            id = "net",
+            amountMinor = 10_000,
+            start = LocalDate.of(2026, 7, 5),
+            period = RecurrencePeriod.WEEK,
+        )
+        val firstDue = LocalDate.of(2026, 7, 5).toEpochDay()
+        val secondDue = LocalDate.of(2026, 7, 12).toEpochDay()
+
+        val result = monthlyObligations(
+            emptyList(),
+            listOf(payment),
+            // Paid through the second occurrence; only the second carries the money.
+            mapOf("net" to secondDue),
+            mapOf(("net" to secondDue) to 20_000L),
+            LocalDate.of(2026, 7, 1).toEpochDay()..LocalDate.of(2026, 7, 12).toEpochDay(),
+        )
+
+        assertEquals(0L, result.remainingMinor)
+        assertEquals(20_000L, result.paidMinor)
+        // 10 000 for the implied first occurrence, 20 000 booked on the second.
+        assertEquals(30_000L, result.totalMinor)
     }
 
     @Test
@@ -120,7 +209,7 @@ class MonthlyObligationsTest {
         // Paid through a date beyond this month: the user paid several months ahead.
         val paidThrough = mapOf("net" to LocalDate.of(2026, 12, 5).toEpochDay())
 
-        val result = monthlyObligations(emptyList(), listOf(payment), paidThrough, july)
+        val result = monthlyObligations(emptyList(), listOf(payment), paidThrough, emptyMap(), july)
 
         assertEquals(0L, result.remainingMinor)
     }
@@ -135,7 +224,7 @@ class MonthlyObligationsTest {
             period = RecurrencePeriod.MONTH,
         )
 
-        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), june)
+        val result = monthlyObligations(emptyList(), listOf(payment), emptyMap(), emptyMap(), june)
 
         // June has 30 days; the occurrence clamps to the 30th rather than skipping the month.
         assertEquals(100_000L, result.recurringMinor)
@@ -165,7 +254,7 @@ class MonthlyObligationsTest {
             name = id,
             type = LoanType.ANNUITY,
             principalMinor = 100_000,
-            rateBp = 1_990,
+            rateMilliPercent = 19_900,
             termMonths = 12,
             startDateEpochDay = LocalDate.of(2026, 1, 1).toEpochDay(),
             paymentDay = 25,

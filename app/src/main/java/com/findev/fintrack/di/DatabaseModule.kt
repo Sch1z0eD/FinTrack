@@ -3,6 +3,9 @@ package com.findev.fintrack.di
 import android.content.Context
 import androidx.room.Room
 import com.findev.fintrack.data.local.FinTrackDatabase
+import com.findev.fintrack.data.local.MIGRATION_1_2
+import com.findev.fintrack.data.local.MIGRATION_2_3
+import com.findev.fintrack.data.local.MIGRATION_3_4
 import com.findev.fintrack.data.local.SeedCategoriesCallback
 import com.findev.fintrack.data.local.dao.AccountDao
 import com.findev.fintrack.data.local.dao.CategoryDao
@@ -32,6 +35,9 @@ object DatabaseModule {
         // No fallbackToDestructiveMigration: migrations are always explicit.
         Room.databaseBuilder(context, FinTrackDatabase::class.java, "fintrack.db")
             .addCallback(SeedCategoriesCallback(context))
+            // No destructive fallback on purpose: a missing migration must fail loudly
+            // rather than quietly wipe the only copy of the user's data.
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
 
     @Provides

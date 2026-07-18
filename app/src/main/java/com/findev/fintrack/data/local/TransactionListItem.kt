@@ -24,6 +24,10 @@ data class TransactionListItem(
     @ColumnInfo(name = "category_name")
     val categoryName: String?,
 
+    /** A part payment against an obligation, so the feed can say so without being opened. */
+    @ColumnInfo(name = "settles_partial")
+    val isPartialSettlement: Boolean = false,
+
     @ColumnInfo(name = "category_icon")
     val categoryIcon: String?,
 

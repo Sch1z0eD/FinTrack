@@ -18,9 +18,9 @@ data class LoanRateEntity(
     @ColumnInfo(name = "loan_id")
     val loanId: String,
 
-    /** Annual rate in basis points (1 bp = 0.01%). */
-    @ColumnInfo(name = "rate_bp")
-    val rateBp: Int,
+    /** Annual rate in thousandths of a percent (1 unit = 0.001%), so 28.572% is 28572. */
+    @ColumnInfo(name = "rate_milli_percent")
+    val rateMilliPercent: Int,
 
     @ColumnInfo(name = "effective_from_epoch_day")
     val effectiveFromEpochDay: Long,

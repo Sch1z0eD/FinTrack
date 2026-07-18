@@ -34,7 +34,7 @@ private val LOAN_REMINDER_TIME: LocalTime = LocalTime.of(10, 0)
  *
  * Same mirror discipline as [PaymentReminderScheduler]: the whole set is rebuilt whenever the
  * loans or their settlements change, so there is nothing to forget to call and nothing left
- * stale. A loan reminds [LoanEntity.reminderDaysBefore] days ahead (its own channel, so it can
+ * stale. A loan reminds at each of [LoanEntity.reminderDaysList] (its own channel, so it can
  * be silenced apart from the recurring "due today" reminders).
  */
 @Singleton
@@ -75,10 +75,13 @@ class LoanReminderScheduler @Inject constructor(
 
     private fun rescheduleAll(loans: List<LoanWithSchedule>, paidThrough: Map<String, Long>) {
         loans.forEach { loan ->
-            cancel(loan.loan.id)
-            val daysBefore = loan.loan.reminderDaysBefore
-            if (!loan.loan.isDeleted && daysBefore != null) {
-                schedule(loan, daysBefore, paidThrough[loan.loan.id])
+            // Cancel every lead time the loan could ever have had, not just its current
+            // ones: a reminder dropped from the list still has a live alarm out there.
+            ALL_LEAD_TIMES.forEach { cancel(loan.loan.id, it) }
+            if (!loan.loan.isDeleted) {
+                loan.loan.reminderDaysList.forEach { daysBefore ->
+                    schedule(loan, daysBefore, paidThrough[loan.loan.id])
+                }
             }
         }
     }
@@ -103,6 +106,7 @@ class LoanReminderScheduler @Inject constructor(
 
         val pending = pendingIntent(
             loanId = loan.loan.id,
+            daysBefore = daysBefore,
             name = loan.loan.name,
             amountMinor = next.paymentMinor,
             flag = PendingIntent.FLAG_UPDATE_CURRENT,
@@ -114,11 +118,11 @@ class LoanReminderScheduler @Inject constructor(
         }
     }
 
-    private fun cancel(loanId: String) {
+    private fun cancel(loanId: String, daysBefore: Int) {
         val alarms = alarmManager ?: return
         val existing = PendingIntent.getBroadcast(
             context,
-            loanId.hashCode(),
+            requestCode(loanId, daysBefore),
             Intent(context, LoanReminderReceiver::class.java),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -128,10 +132,18 @@ class LoanReminderScheduler @Inject constructor(
         }
     }
 
-    private fun pendingIntent(loanId: String, name: String, amountMinor: Long, flag: Int): PendingIntent =
+    private fun pendingIntent(
+        loanId: String,
+        daysBefore: Int,
+        name: String,
+        amountMinor: Long,
+        flag: Int,
+    ): PendingIntent =
         PendingIntent.getBroadcast(
             context,
-            loanId.hashCode(),
+            // The lead time is part of the identity: without it the week-ahead alarm and
+            // the day-before alarm share a request code and overwrite each other.
+            requestCode(loanId, daysBefore),
             Intent(context, LoanReminderReceiver::class.java).apply {
                 putExtra(EXTRA_PAYMENT_ID, loanId)
                 putExtra(EXTRA_PAYMENT_NAME, name)
@@ -141,4 +153,15 @@ class LoanReminderScheduler @Inject constructor(
         )
 
     private fun canScheduleExact(): Boolean = alarmManager?.canScheduleExactAlarms() == true
+
+    private fun requestCode(loanId: String, daysBefore: Int): Int =
+        loanId.hashCode() * 31 + daysBefore
 }
+
+/**
+ * Every lead time the UI can offer.
+ *
+ * Rescheduling walks all of them to cancel, because a lead time the user has just removed
+ * is exactly the one whose alarm is still pending and no longer mentioned by the loan.
+ */
+private val ALL_LEAD_TIMES = listOf(0, 1, 3, 7, 14, 30)
