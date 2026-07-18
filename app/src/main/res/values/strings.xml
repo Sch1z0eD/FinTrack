@@ -49,6 +49,21 @@
     <string name="settings_open_github">Открыть на GitHub</string>
     <string name="settings_install_permission">Разрешите установку из этого источника, иначе обновление не поставится.</string>
 
+    <!-- Backup -->
+    <string name="backup_title">Данные</string>
+    <string name="backup_desc">Приложение работает без сервера, поэтому копия — единственный способ не потерять историю при потере или сбросе телефона.</string>
+    <string name="backup_export">Сохранить копию</string>
+    <string name="backup_import">Восстановить из файла</string>
+    <string name="backup_working">Работаю…</string>
+    <string name="backup_exported">Сохранено, записей: %1$d</string>
+    <string name="backup_imported">Восстановлено записей: %1$d</string>
+    <string name="backup_failed">Не удалось: %1$s</string>
+    <string name="backup_too_new">Файл от более новой версии приложения (схема %1$d, здесь %2$d). Обновите приложение и попробуйте снова.</string>
+    <string name="backup_restore_title">Восстановить из файла?</string>
+    <string name="backup_restore_text">Все текущие данные будут заменены содержимым файла: счета, операции, кредиты, платежи и показания. Отменить это будет нельзя.</string>
+    <string name="backup_restore_confirm">Заменить</string>
+    <string name="backup_restart_hint">Данные заменены. Перезапустите приложение, чтобы все экраны перечитали базу.</string>
+
     <!-- Update notifications -->
     <string name="update_channel_name">Обновления приложения</string>
     <string name="update_channel_description">Сообщение о новой версии на GitHub.</string>

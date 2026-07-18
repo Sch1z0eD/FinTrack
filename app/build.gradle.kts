@@ -140,6 +140,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    // Shadows the Android stub of org.json, which throws "not mocked" in JVM tests.
+    testImplementation(libs.json.unit.test)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
 }

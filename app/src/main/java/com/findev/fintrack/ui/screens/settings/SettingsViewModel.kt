@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.DownloadManager
 import android.content.Context
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.PowerManager
@@ -14,7 +15,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.findev.fintrack.data.AvailableUpdate
 import com.findev.fintrack.data.NoReleasesYetException
+import com.findev.fintrack.R
+import com.findev.fintrack.data.BackupRepository
+import com.findev.fintrack.data.ImportResult
 import com.findev.fintrack.data.SettingsRepository
+import com.findev.fintrack.data.backupFileName
 import com.findev.fintrack.data.ThemeMode
 import com.findev.fintrack.data.UpdateRepository
 import com.findev.fintrack.update.ApkInstaller
@@ -70,11 +75,21 @@ sealed interface UpdateUiState {
     data class Failed(val reason: String) : UpdateUiState
 }
 
+/** What the backup card is showing. */
+sealed interface BackupUiState {
+    data object Idle : BackupUiState
+    data object Working : BackupUiState
+    data class Exported(val rows: Int) : BackupUiState
+    data class Imported(val rows: Int) : BackupUiState
+    data class Failed(val reason: String) : BackupUiState
+}
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val updateRepository: UpdateRepository,
+    private val backupRepository: BackupRepository,
     private val apkInstaller: ApkInstaller,
 ) : ViewModel() {
 
@@ -96,6 +111,44 @@ class SettingsViewModel @Inject constructor(
 
     init {
         refresh()
+    }
+
+    private val _backupState = MutableStateFlow<BackupUiState>(BackupUiState.Idle)
+    val backupState: StateFlow<BackupUiState> = _backupState.asStateFlow()
+
+    /** Name offered to the file picker, so the user does not have to invent one. */
+    fun suggestedBackupName(): String = backupFileName()
+
+    fun onExport(target: Uri) {
+        _backupState.value = BackupUiState.Working
+        viewModelScope.launch {
+            _backupState.value = try {
+                BackupUiState.Exported(backupRepository.export(target, installedVersionName))
+            } catch (e: Exception) {
+                BackupUiState.Failed(e.message ?: "не удалось сохранить")
+            }
+        }
+    }
+
+    fun onImport(source: Uri) {
+        _backupState.value = BackupUiState.Working
+        viewModelScope.launch {
+            _backupState.value = when (val result = backupRepository.import(source)) {
+                is ImportResult.Success -> BackupUiState.Imported(result.rowsRestored)
+                is ImportResult.TooNew -> BackupUiState.Failed(
+                    context.getString(
+                        R.string.backup_too_new,
+                        result.fileSchema,
+                        result.appSchema,
+                    ),
+                )
+                is ImportResult.Invalid -> BackupUiState.Failed(result.reason)
+            }
+        }
+    }
+
+    fun onBackupMessageShown() {
+        _backupState.value = BackupUiState.Idle
     }
 
     fun onThemeModeChange(mode: ThemeMode) {

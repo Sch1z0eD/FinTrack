@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Intent
 import androidx.core.net.toUri
 import android.os.Build
+import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -21,11 +22,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,6 +46,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +68,7 @@ import com.findev.fintrack.data.RELEASES_PAGE_URL
 import com.findev.fintrack.data.ThemeMode
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.PanelCard
+import com.findev.fintrack.ui.dialogContainerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +80,21 @@ fun SettingsScreen(
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val updateState by viewModel.updateState.collectAsStateWithLifecycle()
     val autoUpdateCheck by viewModel.autoUpdateCheck.collectAsStateWithLifecycle()
+    val backupState by viewModel.backupState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var confirmRestore by remember { mutableStateOf<Uri?>(null) }
+
+    // Storage Access Framework: the user picks the file, so the app needs no storage
+    // permission and the copy can land in Drive, on a memory card or anywhere else.
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json"),
+        onResult = { uri -> uri?.let(viewModel::onExport) },
+    )
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+        // Asking before replacing: this is the one action here that destroys data.
+        onResult = { uri -> confirmRestore = uri },
+    )
 
     // The screen is in the foreground, which is the whole reason the system dialog can be
     // raised straight away: the confirmation the installer session asks for cannot be shown
@@ -164,6 +185,14 @@ fun SettingsScreen(
             }
 
             item {
+                BackupCard(
+                    state = backupState,
+                    onExport = { exportLauncher.launch(viewModel.suggestedBackupName()) },
+                    onImport = { importLauncher.launch(arrayOf("application/json")) },
+                )
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.settings_permissions_intro),
                     style = MaterialTheme.typography.bodyMedium,
@@ -214,6 +243,100 @@ fun SettingsScreen(
                         )
                     },
                 )
+            }
+        }
+    }
+
+    confirmRestore?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { confirmRestore = null },
+            shape = RoundedCornerShape(28.dp),
+            containerColor = dialogContainerColor(),
+            tonalElevation = 0.dp,
+            title = { Text(stringResource(R.string.backup_restore_title)) },
+            text = { Text(stringResource(R.string.backup_restore_text)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmRestore = null
+                        viewModel.onImport(uri)
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.backup_restore_confirm),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmRestore = null }) {
+                    Text(stringResource(R.string.account_create_cancel))
+                }
+            },
+        )
+    }
+}
+
+/**
+ * Backup and restore.
+ *
+ * Sits above the permission cards on purpose: with no server behind the app, this is the
+ * only thing standing between a lost phone and a lost history, and it should not be found
+ * by scrolling.
+ */
+@Composable
+private fun BackupCard(
+    state: BackupUiState,
+    onExport: () -> Unit,
+    onImport: () -> Unit,
+) {
+    PanelCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.backup_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = stringResource(R.string.backup_desc),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        when (state) {
+            BackupUiState.Idle -> Unit
+            BackupUiState.Working -> FinTrackProgress(modifier = Modifier.fillMaxWidth())
+            is BackupUiState.Exported -> Text(
+                text = stringResource(R.string.backup_exported, state.rows),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            is BackupUiState.Imported -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.backup_imported, state.rows),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Text(
+                    text = stringResource(R.string.backup_restart_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            is BackupUiState.Failed -> Text(
+                text = stringResource(R.string.backup_failed, state.reason),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Button(onClick = onExport, enabled = state !is BackupUiState.Working) {
+                Text(stringResource(R.string.backup_export))
+            }
+            TextButton(onClick = onImport, enabled = state !is BackupUiState.Working) {
+                Text(stringResource(R.string.backup_import))
             }
         }
     }
