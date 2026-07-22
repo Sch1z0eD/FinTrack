@@ -51,6 +51,20 @@ android {
         }
     }
 
+    // Two distributions of the same app. `github` ships on GitHub Releases and updates itself
+    // from there; `rustore` ships on RuStore, which forbids in-app self-updating, so that
+    // flavor carries no update code, no GitHub link and neither the INTERNET nor the
+    // REQUEST_INSTALL_PACKAGES permission (see app/src/github and app/src/rustore).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+        }
+        create("rustore") {
+            dimension = "distribution"
+        }
+    }
+
     buildTypes {
         // A separate application id, so the build from Android Studio installs alongside the
         // release rather than fighting it for one slot. They are signed with different keys
@@ -90,6 +104,17 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+
+// The beta build type is the self-updating test build (see buildTypes); it only makes sense
+// for the github flavor, so the rustoreBeta variant is dropped rather than left to build an
+// artifact no one ships.
+androidComponents {
+    beforeVariants { variant ->
+        if (variant.buildType == "beta" && variant.productFlavors.any { it.second == "rustore" }) {
+            variant.enable = false
+        }
     }
 }
 

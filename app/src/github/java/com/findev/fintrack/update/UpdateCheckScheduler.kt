@@ -25,7 +25,12 @@ private const val UPDATE_CHECK_WORK = "update_check_daily"
 @Singleton
 class UpdateCheckScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) {
+) : UpdateChecks {
+    override fun setUp() {
+        createChannel()
+        schedule()
+    }
+
     fun createChannel() {
         val manager: NotificationManager = context.getSystemService() ?: return
         manager.createNotificationChannel(

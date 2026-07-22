@@ -49,15 +49,17 @@ jobs:
           # Monotonic as long as minor and patch stay below 100.
           CODE=$((MAJOR * 10000 + MINOR * 100 + PATCH))
 
+          # Only the github flavor is published here; the rustore flavor is uploaded to RuStore
+          # by hand and carries no self-update path, so a tag never builds it.
           if [ "$CHANNEL" = beta ]; then
             # The beta build type appends -beta to the version name itself.
-            echo "gradle_task=:app:assembleBeta" >> "$GITHUB_OUTPUT"
-            echo "apk_path=app/build/outputs/apk/beta/app-beta.apk" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:app:assembleGithubBeta" >> "$GITHUB_OUTPUT"
+            echo "apk_path=app/build/outputs/apk/github/beta/app-github-beta.apk" >> "$GITHUB_OUTPUT"
             echo "asset=fintrack-beta-$NAME.apk" >> "$GITHUB_OUTPUT"
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "gradle_task=:app:assembleRelease" >> "$GITHUB_OUTPUT"
-            echo "apk_path=app/build/outputs/apk/release/app-release.apk" >> "$GITHUB_OUTPUT"
+            echo "gradle_task=:app:assembleGithubRelease" >> "$GITHUB_OUTPUT"
+            echo "apk_path=app/build/outputs/apk/github/release/app-github-release.apk" >> "$GITHUB_OUTPUT"
             echo "asset=fintrack-$NAME.apk" >> "$GITHUB_OUTPUT"
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
@@ -65,7 +67,7 @@ jobs:
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
 
       - name: Unit tests
-        run: ./gradlew :loanengine:test :app:testDebugUnitTest
+        run: ./gradlew :loanengine:test :app:testGithubDebugUnitTest
 
       - name: Decode keystore
         env:

@@ -12,13 +12,10 @@
          for FinTrack from the in-app settings screen. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- The app stores nothing off-device and talks to no server. The only outbound request
-         is the GitHub release check, and it runs when the user asks for it or when they have
-         switched the daily check on - never otherwise. -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Needed to hand a downloaded APK to the package installer: this app updates itself
-         from GitHub Releases rather than through a store. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- This flavor stores nothing off-device and talks to no server at all. The GitHub update
+         check and its INTERNET / REQUEST_INSTALL_PACKAGES permissions live only in the github
+         flavor (app/src/github/AndroidManifest.xml); the rustore build has neither, because
+         RuStore forbids apps that update themselves. -->
 
     <application
         android:name=".FinTrackApplication"
@@ -78,20 +75,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/next_payment_widget_info" />
         </receiver>
-
-        <receiver
-            android:name=".update.UpdateDownloadReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Receives the PackageInstaller session callbacks. Not exported: only the system
-             holds the PendingIntent that targets it. -->
-        <receiver
-            android:name=".update.InstallResultReceiver"
-            android:exported="false" />
 
         <!-- On-demand WorkManager: the app provides its own Configuration (with the Hilt
              worker factory) from FinTrackApplication, so the default startup initializer

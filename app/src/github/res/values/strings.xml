@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- github flavor only: the in-app GitHub update flow. The rustore build ships without any of
+     these strings, because it has no update check. -->
+<resources>
+    <string name="settings_check_updates">Проверить обновления</string>
+    <string name="settings_checking">Проверяем…</string>
+    <string name="settings_up_to_date">Установлена последняя версия</string>
+    <string name="settings_no_releases">Релизов пока нет</string>
+    <string name="settings_update_found">Доступна версия %1$s</string>
+    <string name="settings_update_download">Скачать</string>
+    <string name="settings_update_downloading">Загружается…</string>
+    <string name="settings_update_ready">Версия %1$s загружена. Если окно установки не открылось — нажмите кнопку.</string>
+    <string name="settings_update_downloaded">Версия %1$s уже загружена, качать заново не нужно.</string>
+    <string name="settings_update_install">Установить</string>
+    <string name="settings_update_failed">Не удалось проверить: %1$s</string>
+    <string name="settings_auto_update">Проверять раз в сутки</string>
+    <string name="settings_auto_update_desc">Единственное обращение приложения в сеть. Выключено — проверка только по кнопке.</string>
+    <string name="settings_open_github">Открыть на GitHub</string>
+    <string name="settings_install_permission">Разрешите установку из этого источника, иначе обновление не поставится.</string>
+
+    <!-- Update notifications -->
+    <string name="update_channel_name">Обновления приложения</string>
+    <string name="update_channel_description">Сообщение о новой версии на GitHub.</string>
+    <string name="update_notification_title">Доступно обновление</string>
+    <string name="update_notification_text">FinTrack %1$s — откройте настройки, чтобы скачать</string>
+    <string name="update_ready_title">Обновление загружено</string>
+    <string name="update_ready_text">Нажмите, чтобы установить</string>
+</resources>

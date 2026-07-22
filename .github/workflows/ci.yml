@@ -29,12 +29,14 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew :loanengine:test :app:testDebugUnitTest
+        # github variant runs the shared tests plus the update-engine tests in src/testGithub.
+        run: ./gradlew :loanengine:test :app:testGithubDebugUnitTest
 
       - name: Lint
-        run: ./gradlew :app:lintDebug
+        run: ./gradlew :app:lintGithubDebug
 
       - name: Assemble debug
+        # Builds both distributions (githubDebug + rustoreDebug), so a break in either shows up.
         run: ./gradlew assembleDebug
 
       - name: Upload reports
