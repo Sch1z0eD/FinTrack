@@ -21,20 +21,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,7 +51,8 @@ import com.findev.fintrack.R
 import com.findev.fintrack.ui.FinTrackProgress
 import com.findev.fintrack.data.ThemeMode
 import com.findev.fintrack.ui.PanelCard
-import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.PillSelector
+import com.findev.fintrack.ui.GlassAlertDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -209,11 +205,8 @@ fun SettingsScreen(
     }
 
     confirmRestore?.let { uri ->
-        AlertDialog(
+        GlassAlertDialog(
             onDismissRequest = { confirmRestore = null },
-            shape = RoundedCornerShape(28.dp),
-            containerColor = dialogContainerColor(),
-            tonalElevation = 0.dp,
             title = { Text(stringResource(R.string.backup_restore_title)) },
             text = { Text(stringResource(R.string.backup_restore_text)) },
             confirmButton = {
@@ -324,20 +317,12 @@ private fun ThemeCard(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            ThemeMode.entries.forEachIndexed { index, mode ->
-                SegmentedButton(
-                    selected = mode == selected,
-                    onClick = { onSelect(mode) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = ThemeMode.entries.size,
-                    ),
-                ) {
-                    Text(labels.getValue(mode))
-                }
-            }
-        }
+        PillSelector(
+            options = ThemeMode.entries.map { it to labels.getValue(it) },
+            selected = selected,
+            onSelected = onSelect,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 

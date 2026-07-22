@@ -5,13 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import com.findev.fintrack.ui.AppAssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -26,6 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.formatMilli
 import com.findev.fintrack.ui.formatMinor
@@ -51,7 +51,7 @@ fun ReadingDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     val unit = stringResource(state.unitRes)
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.reading_title, state.meterName), maxLines = 1) },
         text = {
@@ -64,7 +64,7 @@ fun ReadingDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                OutlinedTextField(
+                AppTextField(
                     value = state.valueText,
                     onValueChange = onValueChange,
                     singleLine = true,
@@ -83,7 +83,7 @@ fun ReadingDialog(
                         text = stringResource(R.string.details_date),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { showDatePicker = true },
                         label = { Text(dateLabel(state.dateEpochDay)) },
                     )

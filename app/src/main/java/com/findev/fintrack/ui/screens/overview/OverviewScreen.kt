@@ -1,6 +1,5 @@
 package com.findev.fintrack.ui.screens.overview
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +10,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import com.findev.fintrack.R
 import com.findev.fintrack.data.MonthlyObligations
 import com.findev.fintrack.data.local.AccountBalance
 import com.findev.fintrack.ui.FinTrackProgress
+import com.findev.fintrack.ui.PanelCorner
 import com.findev.fintrack.ui.floatingBottomBarSpace
 import com.findev.fintrack.ui.heroGradient
 import com.findev.fintrack.ui.theme.MoneyColors
@@ -97,10 +99,12 @@ fun OverviewScreen(
 
 @Composable
 private fun NavigationCard(title: String, hint: String, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
@@ -128,10 +132,12 @@ private fun NavigationCard(title: String, hint: String, onClick: () -> Unit) {
 
 @Composable
 private fun StatisticsCard(onOpenStatistics: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenStatistics),
+    Surface(
+        onClick = onOpenStatistics,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier
@@ -165,10 +171,12 @@ private fun AccountsCard(
     accounts: List<AccountBalance>,
     onOpenAccounts: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenAccounts),
+    Surface(
+        onClick = onOpenAccounts,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
@@ -308,7 +316,12 @@ private fun BalanceCard(balanceMinor: Long, freeMinor: Long, hasObligations: Boo
 
 @Composable
 private fun ObligationsCard(obligations: MonthlyObligations) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -430,7 +443,12 @@ private fun TotalCard(
     modifier: Modifier = Modifier,
     amountColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
 ) {
-    Card(modifier = modifier) {
+    Surface(
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()

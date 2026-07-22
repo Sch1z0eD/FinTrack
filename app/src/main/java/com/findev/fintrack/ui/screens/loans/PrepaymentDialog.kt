@@ -1,6 +1,5 @@
 package com.findev.fintrack.ui.screens.loans
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,15 +9,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import com.findev.fintrack.ui.AppAssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.PrepaymentMode
 import com.findev.fintrack.loanengine.PrepaymentEffect
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.formatMinor
 import com.findev.fintrack.ui.shortDate
@@ -68,7 +67,7 @@ fun PrepaymentDialog(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.prepayment_dialog_title)) },
         text = {
@@ -76,7 +75,7 @@ fun PrepaymentDialog(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.amountText,
                     onValueChange = onAmountChange,
                     singleLine = true,
@@ -107,7 +106,7 @@ fun PrepaymentDialog(
                         text = stringResource(R.string.details_date),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { showDatePicker = true },
                         label = { Text(dateLabel(state.dateEpochDay)) },
                     )
@@ -214,17 +213,16 @@ private fun ModeCard(
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
+            // Selection reads from the fill alone - accent container when chosen, a plain
+            // panel tone otherwise. No outline: the 2dp ring round the chosen card was the
+            // heavy edge the rest of this pass is removing.
             containerColor = if (selected) {
                 MaterialTheme.colorScheme.secondaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant
+                MaterialTheme.colorScheme.surfaceContainerHigh
             },
         ),
-        border = if (selected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        },
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(

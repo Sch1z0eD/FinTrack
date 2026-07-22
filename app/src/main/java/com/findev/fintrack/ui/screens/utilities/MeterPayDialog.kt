@@ -5,13 +5,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import com.findev.fintrack.ui.AppAssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -52,12 +52,12 @@ fun MeterPayDialog(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.meter_pay_title, state.note), maxLines = 1) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.amountText,
                     onValueChange = onAmountChange,
                     singleLine = true,
@@ -88,7 +88,7 @@ fun MeterPayDialog(
                         text = stringResource(R.string.details_date),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { showDatePicker = true },
                         label = { Text(dateLabel(state.dateEpochDay)) },
                     )

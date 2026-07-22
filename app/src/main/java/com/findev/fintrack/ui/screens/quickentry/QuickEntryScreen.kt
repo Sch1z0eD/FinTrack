@@ -3,7 +3,6 @@ package com.findev.fintrack.ui.screens.quickentry
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
@@ -11,7 +10,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -43,9 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -77,6 +72,9 @@ import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.TransactionType
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.PanelCorner
+import com.findev.fintrack.ui.PillSelector
+import com.findev.fintrack.ui.borderlessAssistChipColors
+import com.findev.fintrack.ui.borderlessFilterChipColors
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.fieldColors
 import com.findev.fintrack.ui.formatMinor
@@ -230,6 +228,8 @@ private fun QuickEntryContent(
                         showDatePicker = true
                     },
                     label = { Text(dateLabel(state.dateEpochDay)) },
+                    border = null,
+                    colors = borderlessAssistChipColors(),
                 )
 
                 // No permanent field: the comment is asked for only when wanted.
@@ -257,6 +257,8 @@ private fun QuickEntryContent(
                             contentDescription = null,
                         )
                     },
+                    border = null,
+                    colors = borderlessAssistChipColors(),
                 )
             }
 
@@ -362,17 +364,12 @@ private fun TypeSelector(
         if (canTransfer) add(TransactionType.TRANSFER to R.string.quick_entry_transfer)
     }
 
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, (type, labelRes) ->
-            SegmentedButton(
-                selected = selected == type,
-                onClick = { onTypeChange(type) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) {
-                Text(stringResource(labelRes))
-            }
-        }
-    }
+    PillSelector(
+        options = options.map { (type, labelRes) -> type to stringResource(labelRes) },
+        selected = selected,
+        onSelected = onTypeChange,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @Composable
@@ -397,6 +394,8 @@ private fun AccountRow(
                 onClick = onOpenAccounts,
                 label = { Text(stringResource(R.string.quick_entry_no_account_action)) },
                 leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                border = null,
+                colors = borderlessAssistChipColors(),
             )
         }
         return
@@ -414,6 +413,8 @@ private fun AccountRow(
                 selected = account.id == state.selectedAccountId,
                 onClick = { onAccountSelected(account.id) },
                 label = { Text(account.name) },
+                border = null,
+                colors = borderlessFilterChipColors(),
             )
         }
     }
@@ -454,6 +455,8 @@ private fun TransferDestination(
                     selected = account.id == toAccountId,
                     onClick = { onToAccountSelected(account.id) },
                     label = { Text(account.name) },
+                    border = null,
+                    colors = borderlessFilterChipColors(),
                 )
             }
         }
@@ -521,16 +524,12 @@ private fun CategoryCell(
     val accent = Color(category.color.toInt())
     val shape = RoundedCornerShape(14.dp)
 
-    // Colour and ring only. Scaling the selected cell up was the first attempt and it
-    // grew past its own bounds into the row above, so a category in the top row visibly
-    // slid under the date chips.
+    // Colour only, no ring: selection reads from a stronger fill of the category's own
+    // colour. Scaling the selected cell up was an earlier attempt and it grew past its own
+    // bounds into the row above, so a top-row category slid under the date chips.
     val fill by animateColorAsState(
-        targetValue = accent.copy(alpha = if (selected) 0.32f else 0.12f),
+        targetValue = accent.copy(alpha = if (selected) 0.45f else 0.12f),
         label = "categoryFill",
-    )
-    val ring by animateDpAsState(
-        targetValue = if (selected) 2.dp else 0.dp,
-        label = "categoryRing",
     )
 
     Column(
@@ -539,7 +538,6 @@ private fun CategoryCell(
         modifier = Modifier
             .clip(shape)
             .background(fill)
-            .border(ring, accent, shape)
             .clickable(onClick = onClick)
             .padding(vertical = 10.dp, horizontal = 4.dp),
     ) {

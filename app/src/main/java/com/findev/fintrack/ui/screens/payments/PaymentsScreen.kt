@@ -1,6 +1,6 @@
 package com.findev.fintrack.ui.screens.payments
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +19,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.Surface
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -57,6 +57,7 @@ import com.findev.fintrack.ui.NotificationPermissionRequest
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.floatingBottomBarSpace
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.PanelCorner
 
 /**
  * "Paid" is the one state Material's scheme has no colour for - primary means actionable
@@ -366,10 +367,12 @@ private fun LoanCard(
     onClick: () -> Unit,
     onMarkPaid: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
@@ -509,10 +512,12 @@ private fun RecurringCard(
     onMarkPaid: () -> Unit,
     onPayAhead: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
@@ -613,4 +618,12 @@ fun RecurrencePeriod.labelRes(): Int = when (this) {
     RecurrencePeriod.WEEK -> R.string.recurring_period_week
     RecurrencePeriod.MONTH -> R.string.recurring_period_month
     RecurrencePeriod.YEAR -> R.string.recurring_period_year
+}
+
+/** One-word labels for the compact period selector, where "Каждую неделю" would truncate. */
+fun RecurrencePeriod.shortLabelRes(): Int = when (this) {
+    RecurrencePeriod.DAY -> R.string.recurring_period_day_short
+    RecurrencePeriod.WEEK -> R.string.recurring_period_week_short
+    RecurrencePeriod.MONTH -> R.string.recurring_period_month_short
+    RecurrencePeriod.YEAR -> R.string.recurring_period_year_short
 }

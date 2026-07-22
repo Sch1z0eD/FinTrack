@@ -4,10 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import com.findev.fintrack.ui.AppAssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.dateLabel
-import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.fieldColors
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -52,11 +50,8 @@ fun RateChangeDialog(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = dialogContainerColor(),
-        tonalElevation = 0.dp,
         title = { Text(stringResource(R.string.loan_rate_add)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -80,7 +75,7 @@ fun RateChangeDialog(
                         text = stringResource(R.string.loan_rate_effective_from),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { showDatePicker = true },
                         label = { Text(dateLabel(state.dateEpochDay)) },
                     )

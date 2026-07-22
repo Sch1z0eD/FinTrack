@@ -4,8 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import com.findev.fintrack.ui.AppAssistChip
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.formatMinor
 
@@ -49,7 +49,7 @@ fun BatchPayDialog(
 ) {
     var showDatePicker by remember { mutableStateOf(false) }
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(pluralStringResource(R.plurals.pay_batch_title, state.items.size, state.items.size))
@@ -99,7 +99,7 @@ fun BatchPayDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(stringResource(R.string.details_date), style = MaterialTheme.typography.bodyMedium)
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { showDatePicker = true },
                         label = { Text(dateLabel(state.dateEpochDay)) },
                     )

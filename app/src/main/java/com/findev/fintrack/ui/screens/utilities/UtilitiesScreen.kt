@@ -1,6 +1,7 @@
 package com.findev.fintrack.ui.screens.utilities
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,9 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
@@ -26,7 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -55,11 +54,13 @@ import com.findev.fintrack.ui.showUndo
 import com.findev.fintrack.data.monthlyChargeMinor
 import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.ui.AppMenu
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.NotificationPermissionRequest
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.floatingBottomBarSpace
 import com.findev.fintrack.ui.formatMilli
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.PanelCorner
 import com.findev.fintrack.ui.screens.payments.PAID_GREEN
 
 @Composable
@@ -372,10 +373,12 @@ private fun MeterCard(
     onToggleSelect: () -> Unit,
 ) {
     val meter = item.meter
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(PanelCorner),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
             modifier = Modifier
@@ -498,7 +501,7 @@ private fun GroupDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
@@ -508,7 +511,7 @@ private fun GroupDialog(
             )
         },
         text = {
-            OutlinedTextField(
+            AppTextField(
                 value = state.nameText,
                 onValueChange = onNameChange,
                 singleLine = true,

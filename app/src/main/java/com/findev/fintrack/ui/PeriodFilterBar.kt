@@ -11,6 +11,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDateRangePickerState
@@ -154,6 +155,12 @@ fun <T> FilterDropdown(
                     modifier = Modifier.size(AssistChipDefaults.IconSize),
                 )
             },
+            // No outline: a filled tonal pill instead, so a filter reads as one soft chip
+            // rather than a bordered box.
+            border = null,
+            colors = AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ),
         )
         AppMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (value, text) ->

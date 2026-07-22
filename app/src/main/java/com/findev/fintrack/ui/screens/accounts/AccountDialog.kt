@@ -4,9 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.Text
@@ -23,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.ui.FieldShape
-import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.fieldColors
 import com.findev.fintrack.ui.formatMinor
 
@@ -44,11 +42,8 @@ fun AccountDialog(
 
     val trimmedName = name.trim()
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = dialogContainerColor(),
-        tonalElevation = 0.dp,
         title = {
             Text(
                 stringResource(

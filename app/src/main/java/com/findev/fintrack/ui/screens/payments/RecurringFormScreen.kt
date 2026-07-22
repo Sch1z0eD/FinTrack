@@ -14,20 +14,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,7 +43,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
+import com.findev.fintrack.ui.AppAssistChip
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.dateLabel
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -110,7 +107,7 @@ fun RecurringFormScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
+            AppTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
                 singleLine = true,
@@ -119,7 +116,7 @@ fun RecurringFormScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
-            OutlinedTextField(
+            AppTextField(
                 value = state.amountText,
                 onValueChange = viewModel::onAmountChange,
                 singleLine = true,
@@ -151,7 +148,7 @@ fun RecurringFormScreen(
                 )
                 val end = state.endDateEpochDay
                 if (end == null) {
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { datePickerFor = DateField.END },
                         label = { Text(stringResource(R.string.recurring_end_set)) },
                     )
@@ -161,7 +158,7 @@ fun RecurringFormScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    AssistChip(
+                    AppAssistChip(
                         onClick = { datePickerFor = DateField.END },
                         label = { Text(dateLabel(end)) },
                     )
@@ -185,7 +182,7 @@ fun RecurringFormScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    AssistChip(
+                    AppAssistChip(
                         onClick = onOpenAccounts,
                         label = { Text(stringResource(R.string.quick_entry_no_account_action)) },
                     )
@@ -291,7 +288,7 @@ private fun DateRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text = stringResource(labelRes), style = MaterialTheme.typography.bodyMedium)
-        AssistChip(onClick = onClick, label = { Text(label) })
+        AppAssistChip(onClick = onClick, label = { Text(label) })
     }
 }
 
@@ -303,15 +300,10 @@ private fun PeriodSelector(
 ) {
     val options = RecurrencePeriod.entries
 
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, period ->
-            SegmentedButton(
-                selected = selected == period,
-                onClick = { onPeriodChange(period) },
-                shape = SegmentedButtonDefaults.itemShape(index, options.size),
-            ) {
-                Text(stringResource(period.labelRes()))
-            }
-        }
-    }
+    PillSelector(
+        options = options.map { it to stringResource(it.shortLabelRes()) },
+        selected = selected,
+        onSelected = onPeriodChange,
+        modifier = Modifier.fillMaxWidth(),
+    )
 }

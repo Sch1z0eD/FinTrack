@@ -12,9 +12,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
@@ -24,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 /*
@@ -185,8 +190,100 @@ fun fieldColors(): TextFieldColors {
 }
 
 /**
- * Dialog background. Sits low on the tonal scale on purpose, so the fields inside it can
- * sit high and still read as separate boxes - see [fieldColors].
+ * The app's text field: the filled Material [TextField] with [FieldShape] and [fieldColors]
+ * baked in, so forms get no outline and no black label patch (see [fieldColors]) without
+ * repeating the styling at every call. A drop-in for OutlinedTextField - same parameters.
  */
 @Composable
-fun dialogContainerColor(): Color = MaterialTheme.colorScheme.surfaceContainerLow
+fun AppTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null,
+    prefix: (@Composable () -> Unit)? = null,
+    suffix: (@Composable () -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    supportingText: (@Composable () -> Unit)? = null,
+    isError: Boolean = false,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    singleLine: Boolean = false,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+) {
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        enabled = enabled,
+        readOnly = readOnly,
+        label = label,
+        placeholder = placeholder,
+        prefix = prefix,
+        suffix = suffix,
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        supportingText = supportingText,
+        isError = isError,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        singleLine = singleLine,
+        minLines = minLines,
+        maxLines = maxLines,
+        shape = FieldShape,
+        colors = fieldColors(),
+    )
+}
+
+/** Dialog corner radius, shared so the glass hairline can follow the same shape. */
+val DialogShape = RoundedCornerShape(28.dp)
+
+/**
+ * Dialog panel colour. Translucent on purpose.
+ *
+ * A dialog is its own window and cannot sample or blur the screen behind it - only the
+ * floating bottom bar can, because it lives in the same window as the NavHost (see
+ * FinTrackApp). So "glass" here is not blur: it is a tint thin enough that the dimmed
+ * backdrop shows through the panel and, more visibly, through its edges. The fields inside
+ * stay opaque (surfaceContainerHighest, see [fieldColors]), so they read as solid boxes
+ * floating on the glass rather than dissolving into it.
+ */
+@Composable
+fun dialogContainerColor(): Color =
+    MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.90f)
+
+/**
+ * [AlertDialog] dressed as glass: translucent panel, no border, no tonal overlay.
+ *
+ * Wrapping rather than styling each call site keeps every dialog identical and stops the
+ * default 6dp tonal elevation from quietly re-opacifying the translucent container. No
+ * outline: a hairline round the whole panel read as a plain framed grey box rather than
+ * an edge of glass, so the depth comes only from the translucency over the dimmed screen.
+ */
+@Composable
+fun GlassAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    dismissButton: (@Composable () -> Unit)? = null,
+    title: (@Composable () -> Unit)? = null,
+    text: (@Composable () -> Unit)? = null,
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = confirmButton,
+        dismissButton = dismissButton,
+        title = title,
+        text = text,
+        modifier = modifier,
+        shape = DialogShape,
+        containerColor = dialogContainerColor(),
+        tonalElevation = 0.dp,
+    )
+}

@@ -15,13 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,7 +36,8 @@ import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.CategoryType
 import com.findev.fintrack.ui.FieldShape
-import com.findev.fintrack.ui.dialogContainerColor
+import com.findev.fintrack.ui.GlassAlertDialog
+import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.fieldColors
 
 /** Same palette the seeded categories use, so custom ones do not look foreign. */
@@ -68,11 +64,8 @@ fun CategoryDialog(
     val trimmedName = name.trim()
     val trimmedIcon = icon.trim()
 
-    AlertDialog(
+    GlassAlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        containerColor = dialogContainerColor(),
-        tonalElevation = 0.dp,
         title = {
             Text(
                 stringResource(
@@ -88,17 +81,12 @@ fun CategoryDialog(
                         CategoryType.EXPENSE to R.string.quick_entry_expense,
                         CategoryType.INCOME to R.string.quick_entry_income,
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        options.forEachIndexed { index, (option, labelRes) ->
-                            SegmentedButton(
-                                selected = type == option,
-                                onClick = { type = option },
-                                shape = SegmentedButtonDefaults.itemShape(index, options.size),
-                            ) {
-                                Text(stringResource(labelRes))
-                            }
-                        }
-                    }
+                    PillSelector(
+                        options = options.map { (option, labelRes) -> option to stringResource(labelRes) },
+                        selected = type,
+                        onSelected = { type = it },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 TextField(

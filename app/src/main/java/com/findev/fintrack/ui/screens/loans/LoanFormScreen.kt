@@ -14,8 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -23,15 +21,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,8 +48,13 @@ import com.findev.fintrack.data.local.entity.LoanType
 import com.findev.fintrack.data.local.entity.PrepaymentMode
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
+import com.findev.fintrack.ui.AppAssistChip
+import com.findev.fintrack.ui.AppFilterChip
+import com.findev.fintrack.ui.AppTextField
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.FieldShape
+import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
 
 private const val MILLIS_PER_DAY = 86_400_000L
@@ -115,7 +113,7 @@ fun LoanFormScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
+            AppTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
                 singleLine = true,
@@ -133,7 +131,7 @@ fun LoanFormScreen(
             )
 
             if (state.showsRate) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.rateText,
                     onValueChange = viewModel::onRateChange,
                     singleLine = true,
@@ -168,7 +166,7 @@ fun LoanFormScreen(
                     text = stringResource(R.string.loan_start_date),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                AssistChip(
+                AppAssistChip(
                     onClick = { showDatePicker = true },
                     label = { Text(dateLabel(state.startDateEpochDay)) },
                 )
@@ -185,7 +183,7 @@ fun LoanFormScreen(
                     text = stringResource(R.string.loan_first_payment),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                AssistChip(
+                AppAssistChip(
                     onClick = { showFirstPaymentPicker = true },
                     label = {
                         Text(
@@ -206,7 +204,7 @@ fun LoanFormScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.termText,
                     onValueChange = viewModel::onTermChange,
                     singleLine = true,
@@ -214,7 +212,7 @@ fun LoanFormScreen(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
                 )
-                OutlinedTextField(
+                AppTextField(
                     value = state.paymentDayText,
                     onValueChange = viewModel::onPaymentDayChange,
                     singleLine = true,
@@ -327,7 +325,7 @@ fun LoanFormScreen(
     }
 
     if (confirmDelete) {
-        AlertDialog(
+        GlassAlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.loan_delete)) },
             text = { Text(stringResource(R.string.loan_delete_confirm, state.name)) },
@@ -423,7 +421,7 @@ private fun ReminderSection(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 REMINDER_PRESETS.forEach { (days, labelRes) ->
-                    FilterChip(
+                    AppFilterChip(
                         selected = days in selectedDays,
                         onClick = { onDayToggle(days) },
                         label = { Text(stringResource(labelRes)) },
@@ -463,9 +461,9 @@ private fun PrepaymentRuleSelector(
     onSelect: (PrepaymentMode?) -> Unit,
 ) {
     val options = listOf(
-        null to R.string.loan_prepayment_rule_any,
-        PrepaymentMode.REDUCE_TERM to R.string.loan_prepayment_rule_term,
-        PrepaymentMode.REDUCE_PAYMENT to R.string.loan_prepayment_rule_payment,
+        null to R.string.loan_prepayment_rule_any_short,
+        PrepaymentMode.REDUCE_TERM to R.string.loan_prepayment_rule_term_short,
+        PrepaymentMode.REDUCE_PAYMENT to R.string.loan_prepayment_rule_payment_short,
     )
 
     Text(
@@ -473,17 +471,12 @@ private fun PrepaymentRuleSelector(
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, (mode, labelRes) ->
-            SegmentedButton(
-                selected = selected == mode,
-                onClick = { onSelect(mode) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
-            ) {
-                Text(stringResource(labelRes))
-            }
-        }
-    }
+    PillSelector(
+        options = options.map { (mode, labelRes) -> mode to stringResource(labelRes) },
+        selected = selected,
+        onSelected = onSelect,
+        modifier = Modifier.fillMaxWidth(),
+    )
     Text(
         text = stringResource(R.string.loan_prepayment_rule_hint),
         style = MaterialTheme.typography.bodySmall,
@@ -497,7 +490,7 @@ private fun MoneyField(
     onValueChange: (String) -> Unit,
     labelRes: Int,
 ) {
-    OutlinedTextField(
+    AppTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,

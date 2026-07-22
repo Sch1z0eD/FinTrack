@@ -25,6 +25,7 @@ import com.findev.fintrack.data.local.TransactionListItem
 import com.findev.fintrack.data.local.entity.TransactionType
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.theme.MoneyColors
 
 /**
  * Read-only look at a transaction. Editing lives behind the swipe actions on purpose,
@@ -73,10 +74,12 @@ fun TransactionDetailsSheet(
                 Text(
                     text = stringResource(R.string.money_with_currency, signedAmount(item)),
                     style = MaterialTheme.typography.titleLarge,
-                    color = if (item.type == TransactionType.INCOME) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
+                    // Same money colours as the feed row: income green, expense red, a
+                    // transfer is neither so it stays neutral.
+                    color = when (item.type) {
+                        TransactionType.INCOME -> MoneyColors.income
+                        TransactionType.EXPENSE -> MoneyColors.expense
+                        TransactionType.TRANSFER -> MaterialTheme.colorScheme.onSurface
                     },
                 )
             }

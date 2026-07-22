@@ -17,7 +17,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -90,7 +90,7 @@ fun MeterFormScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
+            AppTextField(
                 value = state.name,
                 onValueChange = viewModel::onNameChange,
                 singleLine = true,
@@ -123,7 +123,7 @@ fun MeterFormScreen(
 
             // A fixed fee stores a monthly sum, not a per-unit tariff, so the label changes;
             // otherwise it is priced per whatever the meter counts, so it follows the type.
-            OutlinedTextField(
+            AppTextField(
                 value = state.tariffText,
                 onValueChange = viewModel::onTariffChange,
                 singleLine = true,
@@ -152,7 +152,7 @@ fun MeterFormScreen(
             // Water is billed for supply and for drainage on the same volume, so a water
             // meter takes a second tariff; other meters have no such line.
             if (state.isWater) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.drainageText,
                     onValueChange = viewModel::onDrainageChange,
                     singleLine = true,
@@ -169,7 +169,7 @@ fun MeterFormScreen(
             if (state.isNorm) {
                 // No readings to submit, so no reminder day: what is asked for instead is the
                 // fixed monthly volume, and what it costs is shown straight away.
-                OutlinedTextField(
+                AppTextField(
                     value = state.normText,
                     onValueChange = viewModel::onNormChange,
                     singleLine = true,
@@ -189,7 +189,7 @@ fun MeterFormScreen(
                     )
                 }
             } else if (state.isMetered) {
-                OutlinedTextField(
+                AppTextField(
                     value = state.reminderDayText,
                     onValueChange = viewModel::onReminderDayChange,
                     singleLine = true,
