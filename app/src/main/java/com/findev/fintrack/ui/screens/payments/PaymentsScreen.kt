@@ -90,7 +90,7 @@ fun PaymentsScreen(
     }
 
     NotificationPermissionRequest(
-        needed = state.payments.any { it is PaymentItem.Recurring && it.reminderEnabled },
+        needed = state.payments.any { it is PaymentItem.Recurring && it.reminderDays.isNotEmpty() },
     )
 
     val paidMessage = stringResource(R.string.payment_paid_snackbar)
@@ -581,18 +581,17 @@ private fun RecurringCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                if (payment.reminderEnabled && !payment.hasEnded) {
-                    Icon(
-                        imageVector = Icons.Filled.Notifications,
-                        contentDescription = stringResource(R.string.recurring_reminder),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Text(
                     text = stringResource(payment.period.labelRes()),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
                 )
+            }
+
+            // Same "Напомню за …" line loans show, now that a recurring payment carries the
+            // full lead-time list rather than a single on/off bell.
+            if (payment.reminderDays.isNotEmpty() && !payment.hasEnded) {
+                ReminderRow(days = payment.reminderDays)
             }
 
             Row(

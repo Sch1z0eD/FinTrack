@@ -14,6 +14,12 @@
     <string name="overview_balance">Баланс</string>
     <string name="overview_expense_month">Расходы за месяц</string>
     <string name="overview_income_month">Доходы за месяц</string>
+    <string name="overview_avg_title">В среднем</string>
+    <string name="overview_avg_day">В день</string>
+    <string name="overview_avg_week">В неделю</string>
+    <string name="overview_avg_month">В месяц</string>
+    <string name="overview_avg_year">В год</string>
+    <string name="overview_saldo">Сальдо</string>
     <string name="overview_accounts">Счета</string>
     <string name="overview_archived_section">Архив (не в балансе)</string>
     <string name="overview_free">Свободно после обязательных</string>
@@ -233,6 +239,7 @@
     <string name="loan_reminder_channel_description">Напоминание за несколько дней до платежа по кредиту</string>
     <string name="loan_reminder_title">Скоро платёж по кредиту: %1$s</string>
     <string name="meter_reminder_text">Счётчик «%1$s» — время снять показания</string>
+    <string name="meter_reminder_pay_text">«%1$s» — пора оплатить</string>
 
     <!-- Loans -->
     <string name="loans_next_payment">Платёж %1$s</string>
@@ -343,6 +350,8 @@
     <string name="meter_tariff">Тариф за %1$s</string>
     <string name="meter_reminder_day">День напоминания</string>
     <string name="meter_reminder_hint">Число месяца, когда напомнить передать показания</string>
+    <string name="meter_payment_day">День оплаты</string>
+    <string name="meter_payment_day_hint">Число месяца, к которому платят; напоминания считаются от него</string>
     <string name="meter_delete">Удалить счётчик</string>
     <string name="meter_delete_confirm">Удалить счётчик «%1$s»? Его показания и история пропадут</string>
     <string name="meter_tariff_now">%1$s за %2$s</string>

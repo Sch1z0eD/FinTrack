@@ -120,7 +120,8 @@ sealed interface PaymentItem {
         override val isDue: Boolean,
         override val isSettled: Boolean,
         val period: RecurrencePeriod,
-        val reminderEnabled: Boolean,
+        /** Reminder lead times, furthest out first; empty means no reminder. */
+        val reminderDays: List<Int>,
         val accountId: String,
         val categoryId: String,
         /** The anchor every occurrence is counted from. */
@@ -503,7 +504,7 @@ private fun RecurringPaymentEntity.toItem(
         isDue = due != null && !due.isAfter(today),
         isSettled = paidThroughEpochDay != null && due != null && due.isAfter(today),
         period = period,
-        reminderEnabled = reminderEnabled,
+        reminderDays = reminderDaysList,
         accountId = accountId,
         categoryId = categoryId,
         startDateEpochDay = startDateEpochDay,

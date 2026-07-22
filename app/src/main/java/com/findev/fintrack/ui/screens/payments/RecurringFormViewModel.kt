@@ -40,10 +40,15 @@ data class RecurringFormUiState(
     val selectedAccountId: String? = null,
     val categories: List<CategoryEntity> = emptyList(),
     val selectedCategoryId: String? = null,
+    /** Lead times picked, furthest out first; only used when [reminderEnabled]. */
+    val reminderDays: List<Int> = listOf(3),
     val reminderEnabled: Boolean = true,
     val isEditing: Boolean = false,
 ) {
     val amountMinor: Long get() = parseAmountToMinor(amountText)
+
+    /** What gets saved: the picked lead times, or none when the switch is off. */
+    val savedReminderDays: List<Int> get() = if (reminderEnabled) reminderDays else emptyList()
 
     val canSave: Boolean
         get() = name.isNotBlank() &&
@@ -74,6 +79,7 @@ class RecurringFormViewModel @Inject constructor(
         val endDateEpochDay: Long? = null,
         val selectedAccountId: String? = null,
         val selectedCategoryId: String? = null,
+        val reminderDays: List<Int> = listOf(3),
         val reminderEnabled: Boolean = true,
     )
 
@@ -99,6 +105,7 @@ class RecurringFormViewModel @Inject constructor(
             selectedAccountId = current.selectedAccountId ?: accounts.firstOrNull()?.id,
             categories = categories,
             selectedCategoryId = current.selectedCategoryId ?: categories.firstOrNull()?.id,
+            reminderDays = current.reminderDays,
             reminderEnabled = current.reminderEnabled,
             isEditing = editedId != null,
         )
@@ -120,7 +127,10 @@ class RecurringFormViewModel @Inject constructor(
                     endDateEpochDay = payment.endDateEpochDay,
                     selectedAccountId = payment.accountId,
                     selectedCategoryId = payment.categoryId,
-                    reminderEnabled = payment.reminderEnabled,
+                    // Reuse the loan pattern: empty list means the reminder was off, so the
+                    // switch reads off but the presets keep a sensible default to switch on to.
+                    reminderDays = payment.reminderDaysList.ifEmpty { listOf(3) },
+                    reminderEnabled = payment.reminderDaysList.isNotEmpty(),
                 )
             }
         }
@@ -140,7 +150,13 @@ class RecurringFormViewModel @Inject constructor(
 
     fun onCategorySelected(id: String) = input.update { it.copy(selectedCategoryId = id) }
 
-    fun onReminderChange(enabled: Boolean) = input.update { it.copy(reminderEnabled = enabled) }
+    fun onReminderEnabledChange(enabled: Boolean) = input.update { it.copy(reminderEnabled = enabled) }
+
+    /** Toggles one lead time; the rest stay as they were. */
+    fun onReminderDayToggle(days: Int) = input.update { state ->
+        val next = if (days in state.reminderDays) state.reminderDays - days else state.reminderDays + days
+        state.copy(reminderDays = next.sortedDescending())
+    }
 
     fun onSave() {
         val state = uiState.value
@@ -159,7 +175,7 @@ class RecurringFormViewModel @Inject constructor(
                     endDateEpochDay = state.endDateEpochDay,
                     accountId = accountId,
                     categoryId = categoryId,
-                    reminderEnabled = state.reminderEnabled,
+                    reminderDays = state.savedReminderDays,
                 )
             } else {
                 recurringPaymentRepository.update(
@@ -171,7 +187,7 @@ class RecurringFormViewModel @Inject constructor(
                     endDateEpochDay = state.endDateEpochDay,
                     accountId = accountId,
                     categoryId = categoryId,
-                    reminderEnabled = state.reminderEnabled,
+                    reminderDays = state.savedReminderDays,
                 )
             }
             savedChannel.send(Unit)

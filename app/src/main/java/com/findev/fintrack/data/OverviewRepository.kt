@@ -1,6 +1,7 @@
 package com.findev.fintrack.data
 
 import com.findev.fintrack.data.local.AccountBalance
+import com.findev.fintrack.data.local.AverageBasis
 import com.findev.fintrack.data.local.MonthTotals
 import com.findev.fintrack.data.local.dao.OverviewDao
 import kotlinx.coroutines.flow.Flow
@@ -15,4 +16,6 @@ class OverviewRepository @Inject constructor(
 
     fun observeTotals(fromEpochDay: Long, toEpochDay: Long): Flow<MonthTotals> =
         overviewDao.observeTotals(fromEpochDay, toEpochDay)
+
+    fun observeAverageBasis(): Flow<AverageBasis> = overviewDao.observeAverageBasis()
 }

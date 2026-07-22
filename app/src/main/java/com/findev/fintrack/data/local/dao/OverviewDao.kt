@@ -3,6 +3,7 @@ package com.findev.fintrack.data.local.dao
 import androidx.room.Dao
 import androidx.room.Query
 import com.findev.fintrack.data.local.AccountBalance
+import com.findev.fintrack.data.local.AverageBasis
 import com.findev.fintrack.data.local.MonthTotals
 import kotlinx.coroutines.flow.Flow
 
@@ -88,4 +89,17 @@ interface OverviewDao {
         """,
     )
     fun observeTotals(fromEpochDay: Long, toEpochDay: Long): Flow<MonthTotals>
+
+    /** All-time income/expense and the earliest transaction date, for the average figures. */
+    @Query(
+        """
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount_minor ELSE 0 END), 0) AS expense_minor,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount_minor ELSE 0 END), 0) AS income_minor,
+            MIN(date_epoch_day) AS first_day
+        FROM transactions
+        WHERE is_deleted = 0 AND type != 'TRANSFER'
+        """,
+    )
+    fun observeAverageBasis(): Flow<AverageBasis>
 }

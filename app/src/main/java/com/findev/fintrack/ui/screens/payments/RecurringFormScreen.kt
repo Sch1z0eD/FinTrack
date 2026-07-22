@@ -23,7 +23,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import com.findev.fintrack.ui.AppTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -46,6 +45,7 @@ import com.findev.fintrack.data.local.entity.RecurrencePeriod
 import com.findev.fintrack.ui.AppAssistChip
 import com.findev.fintrack.ui.ChipRow
 import com.findev.fintrack.ui.ConfirmDeleteDialog
+import com.findev.fintrack.ui.ReminderSection
 import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.dateLabel
 
@@ -204,20 +204,12 @@ fun RecurringFormScreen(
                 onSelected = viewModel::onCategorySelected,
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.recurring_reminder),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Switch(
-                    checked = state.reminderEnabled,
-                    onCheckedChange = viewModel::onReminderChange,
-                )
-            }
+            ReminderSection(
+                enabled = state.reminderEnabled,
+                selectedDays = state.reminderDays,
+                onEnabledChange = viewModel::onReminderEnabledChange,
+                onDayToggle = viewModel::onReminderDayToggle,
+            )
 
             Button(
                 onClick = viewModel::onSave,

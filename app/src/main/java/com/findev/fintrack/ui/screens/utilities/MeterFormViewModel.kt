@@ -37,7 +37,11 @@ data class MeterFormUiState(
     val drainageText: String = "",
     /** Monthly volume for a normative service; parsed like a reading, not like money. */
     val normText: String = "",
-    val reminderDayText: String = "",
+    /** Day of month the bill is due; reminders count back from it. Applies to every kind. */
+    val paymentDayText: String = "",
+    /** Lead times picked, furthest out first; only used when [reminderEnabled]. */
+    val reminderDays: List<Int> = listOf(3),
+    val reminderEnabled: Boolean = true,
     /** The group this service is filed under, or null for «Без группы». */
     val groupId: String? = null,
     /** Every group, for the picker. */
@@ -47,7 +51,10 @@ data class MeterFormUiState(
     val tariffMinor: Long get() = parseAmountToMinor(tariffText)
     val drainageMinor: Long get() = parseAmountToMinor(drainageText)
     val normMilli: Long get() = parseMeterToMilli(normText)
-    val reminderDay: Int get() = reminderDayText.toIntOrNull() ?: 0
+    val paymentDay: Int get() = paymentDayText.toIntOrNull() ?: 0
+
+    /** What gets saved: the picked lead times, or none when the switch is off. */
+    val savedReminderDays: List<Int> get() = if (reminderEnabled) reminderDays else emptyList()
 
     val isNorm: Boolean get() = billing == BillingKind.NORM
     val isFixed: Boolean get() = billing == BillingKind.FIXED
@@ -69,10 +76,10 @@ data class MeterFormUiState(
     fun drainageForType(): Long = if (isWater) drainageMinor else 0
 
     val canSave: Boolean
-        get() = name.isNotBlank() && tariffMinor > 0 && when (billing) {
+        get() = name.isNotBlank() && tariffMinor > 0 && paymentDay in 1..31 && when (billing) {
             BillingKind.NORM -> normMilli > 0
             BillingKind.FIXED -> true
-            BillingKind.METERED -> reminderDay in 1..31
+            BillingKind.METERED -> true
         }
 }
 
@@ -117,7 +124,9 @@ class MeterFormViewModel @Inject constructor(
                         tariffText = formatAmountForInput(meter.tariffMinor),
                         drainageText = if (meter.drainageTariffMinor > 0) formatAmountForInput(meter.drainageTariffMinor) else "",
                         normText = if (meter.normMilli > 0) formatMeterForInput(meter.normMilli) else "",
-                        reminderDayText = meter.reminderDay.takeIf { d -> d > 0 }?.toString().orEmpty(),
+                        paymentDayText = meter.paymentDay.takeIf { d -> d > 0 }?.toString().orEmpty(),
+                        reminderDays = meter.reminderDaysList.ifEmpty { listOf(3) },
+                        reminderEnabled = meter.reminderDaysList.isNotEmpty(),
                         groupId = meter.groupId,
                         isEditing = true,
                     )
@@ -140,19 +149,24 @@ class MeterFormViewModel @Inject constructor(
 
     fun onNormChange(text: String) = _uiState.update { it.copy(normText = sanitizeMeterInput(text)) }
 
-    fun onReminderDayChange(text: String) = _uiState.update {
-        it.copy(reminderDayText = text.filter(Char::isDigit).take(2))
+    fun onPaymentDayChange(text: String) = _uiState.update {
+        it.copy(paymentDayText = text.filter(Char::isDigit).take(2))
+    }
+
+    fun onReminderEnabledChange(enabled: Boolean) = _uiState.update { it.copy(reminderEnabled = enabled) }
+
+    /** Toggles one lead time; the rest stay as they were. */
+    fun onReminderDayToggle(days: Int) = _uiState.update { state ->
+        val next = if (days in state.reminderDays) state.reminderDays - days else state.reminderDays + days
+        state.copy(reminderDays = next.sortedDescending())
     }
 
     fun onSave() {
         val state = _uiState.value
         if (!state.canSave) return
 
-        // A normative service takes no readings, so it has nothing to be reminded about and
-        // no norm to keep once it gets a meter. Whichever branch is off is stored empty
-        // rather than left holding a stale number from the other one.
+        // A normative service takes no readings, so it keeps no norm once it becomes metered.
         val normMilli = if (state.isNorm) state.normMilli else 0
-        val reminderDay = if (state.isMetered) state.reminderDay else 0
 
         val drainageMinor = state.drainageForType()
 
@@ -165,7 +179,8 @@ class MeterFormViewModel @Inject constructor(
                     tariffMinor = state.tariffMinor,
                     drainageTariffMinor = drainageMinor,
                     normMilli = normMilli,
-                    reminderDay = reminderDay,
+                    paymentDay = state.paymentDay,
+                    reminderDays = state.savedReminderDays,
                     groupId = state.groupId,
                 )
             } else {
@@ -177,7 +192,8 @@ class MeterFormViewModel @Inject constructor(
                     tariffMinor = state.tariffMinor,
                     drainageTariffMinor = drainageMinor,
                     normMilli = normMilli,
-                    reminderDay = reminderDay,
+                    paymentDay = state.paymentDay,
+                    reminderDays = state.savedReminderDays,
                     groupId = state.groupId,
                 )
             }

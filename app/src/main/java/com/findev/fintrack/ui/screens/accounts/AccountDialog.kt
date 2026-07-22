@@ -23,7 +23,10 @@ import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.fieldColors
+import com.findev.fintrack.ui.formatAmountForInput
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.parseAmountToMinor
+import com.findev.fintrack.ui.sanitizeAmountInput
 
 /** Creates an account, or edits one when [account] is given. */
 @Composable
@@ -36,8 +39,8 @@ fun AccountDialog(
 ) {
     var name by remember { mutableStateOf(account?.name.orEmpty()) }
     var balance by remember {
-        // Whole rubles: the opening balance is a round figure the user types by hand.
-        mutableStateOf(account?.let { (it.initialBalanceMinor / 100).toString() } ?: "")
+        // Kopeck-aware, like every other amount field: a card's opening balance is rarely round.
+        mutableStateOf(account?.let { formatAmountForInput(it.initialBalanceMinor) } ?: "")
     }
 
     val trimmedName = name.trim()
@@ -65,13 +68,13 @@ fun AccountDialog(
                 )
                 TextField(
                     value = balance,
-                    onValueChange = { input -> balance = input.filter { it.isDigit() }.take(9) },
+                    onValueChange = { input -> balance = sanitizeAmountInput(input) },
                     singleLine = true,
                     shape = FieldShape,
                     colors = fieldColors(),
                     label = { Text(stringResource(R.string.account_create_balance)) },
                     suffix = { Text(stringResource(R.string.money_with_currency, "")) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
 
@@ -98,7 +101,7 @@ fun AccountDialog(
         confirmButton = {
             TextButton(
                 enabled = trimmedName.isNotEmpty(),
-                onClick = { onConfirm(trimmedName, (balance.toLongOrNull() ?: 0L) * 100) },
+                onClick = { onConfirm(trimmedName, parseAmountToMinor(balance)) },
             ) {
                 Text(
                     stringResource(

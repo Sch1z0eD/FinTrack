@@ -110,14 +110,17 @@ data class LoanEntity(
     val isDeleted: Boolean = false,
 ) {
     /** Lead times, sorted furthest-out first, empty when reminders are off. */
-    val reminderDaysList: List<Int>
-        get() = reminderDays
-            ?.split(',')
-            ?.mapNotNull { it.trim().toIntOrNull() }
-            ?.distinct()
-            ?.sortedDescending()
-            .orEmpty()
+    val reminderDaysList: List<Int> get() = reminderDaysFromStored(reminderDays)
 }
+
+/** Parses the stored comma-separated lead times; furthest-out first, empty when off. */
+fun reminderDaysFromStored(stored: String?): List<Int> =
+    stored
+        ?.split(',')
+        ?.mapNotNull { it.trim().toIntOrNull() }
+        ?.distinct()
+        ?.sortedDescending()
+        .orEmpty()
 
 /** Renders lead times back into the stored form; empty means "no reminder". */
 fun reminderDaysToStored(days: List<Int>): String? =

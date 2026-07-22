@@ -6,6 +6,7 @@ import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.data.local.entity.MeterEntity
 import com.findev.fintrack.data.local.entity.MeterReadingEntity
 import com.findev.fintrack.data.local.entity.MeterType
+import com.findev.fintrack.data.local.entity.reminderDaysToStored
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -35,7 +36,8 @@ class MeterRepository @Inject constructor(
         tariffMinor: Long,
         drainageTariffMinor: Long,
         normMilli: Long,
-        reminderDay: Int,
+        paymentDay: Int,
+        reminderDays: List<Int>,
         groupId: String? = null,
     ): String {
         val id = UUID.randomUUID().toString()
@@ -48,7 +50,8 @@ class MeterRepository @Inject constructor(
                 tariffMinor = tariffMinor,
                 drainageTariffMinor = drainageTariffMinor,
                 normMilli = normMilli,
-                reminderDay = reminderDay,
+                paymentDay = paymentDay,
+                reminderDays = reminderDaysToStored(reminderDays),
                 groupId = groupId,
                 updatedAt = System.currentTimeMillis(),
             ),
@@ -68,7 +71,8 @@ class MeterRepository @Inject constructor(
         tariffMinor: Long,
         drainageTariffMinor: Long,
         normMilli: Long,
-        reminderDay: Int,
+        paymentDay: Int,
+        reminderDays: List<Int>,
         groupId: String? = null,
     ) {
         val existing = requireNotNull(meterDao.getById(id)) { "No meter with id $id" }
@@ -80,7 +84,8 @@ class MeterRepository @Inject constructor(
                 tariffMinor = tariffMinor,
                 drainageTariffMinor = drainageTariffMinor,
                 normMilli = normMilli,
-                reminderDay = reminderDay,
+                paymentDay = paymentDay,
+                reminderDays = reminderDaysToStored(reminderDays),
                 groupId = groupId,
                 updatedAt = System.currentTimeMillis(),
             ),

@@ -205,3 +205,99 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("UPDATE transactions SET created_at = updated_at")
     }
 }
+
+/**
+ * 8 -> 9: a recurring payment can remind more than once, like a loan.
+ *
+ * reminder_enabled (a bool) becomes reminder_days, a comma-separated list of lead times.
+ * SQLite cannot retype a column in place, so the table is rebuilt. Every payment that had a
+ * reminder on carries over as "0" - remind on the day, which is exactly what the flag did -
+ * and one that had it off carries over as NULL.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE `recurring_payment_new` (
+                `id` TEXT NOT NULL, `name` TEXT NOT NULL, `amount_minor` INTEGER NOT NULL,
+                `period` TEXT NOT NULL, `start_date_epoch_day` INTEGER NOT NULL,
+                `end_date_epoch_day` INTEGER, `account_id` TEXT NOT NULL,
+                `category_id` TEXT NOT NULL, `reminder_days` TEXT,
+                `updated_at` INTEGER NOT NULL, `is_deleted` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO recurring_payment_new (
+                id, name, amount_minor, period, start_date_epoch_day, end_date_epoch_day,
+                account_id, category_id, reminder_days, updated_at, is_deleted
+            )
+            SELECT
+                id, name, amount_minor, period, start_date_epoch_day, end_date_epoch_day,
+                account_id, category_id,
+                CASE WHEN reminder_enabled = 1 THEN '0' ELSE NULL END,
+                updated_at, is_deleted
+            FROM recurring_payment
+            """.trimIndent(),
+        )
+        db.execSQL("DROP TABLE recurring_payment")
+        db.execSQL("ALTER TABLE recurring_payment_new RENAME TO recurring_payment")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_recurring_payment_account_id` " +
+                "ON `recurring_payment` (`account_id`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_recurring_payment_category_id` " +
+                "ON `recurring_payment` (`category_id`)",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_recurring_payment_start_date_epoch_day` " +
+                "ON `recurring_payment` (`start_date_epoch_day`)",
+        )
+    }
+}
+
+/**
+ * 9 -> 10: ЖКХ reminders become a payment day plus lead times, for every service.
+ *
+ * reminder_day (a metered-only "submit readings" day) is replaced by payment_day - the day the
+ * bill is due, meaningful for norm and fixed services too - and reminder_days, the same
+ * lead-time list a loan has. The table is rebuilt because a column is dropped and the type of
+ * the reminder changes. A service that had a reminder day carries it over as its payment day and
+ * a "0" lead time (remind on the day, as before); one without keeps a default 1st and no
+ * reminder.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE `meter_new` (
+                `id` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL,
+                `billing` TEXT NOT NULL, `tariff_minor` INTEGER NOT NULL,
+                `drainage_tariff_minor` INTEGER NOT NULL, `norm_milli` INTEGER NOT NULL,
+                `payment_day` INTEGER NOT NULL DEFAULT 1, `reminder_days` TEXT, `group_id` TEXT,
+                `updated_at` INTEGER NOT NULL, `is_deleted` INTEGER NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent(),
+        )
+        db.execSQL(
+            """
+            INSERT INTO meter_new (
+                id, name, type, billing, tariff_minor, drainage_tariff_minor, norm_milli,
+                payment_day, reminder_days, group_id, updated_at, is_deleted
+            )
+            SELECT
+                id, name, type, billing, tariff_minor, drainage_tariff_minor, norm_milli,
+                CASE WHEN reminder_day BETWEEN 1 AND 31 THEN reminder_day ELSE 1 END,
+                CASE WHEN reminder_day BETWEEN 1 AND 31 THEN '0' ELSE NULL END,
+                group_id, updated_at, is_deleted
+            FROM meter
+            """.trimIndent(),
+        )
+        db.execSQL("DROP TABLE meter")
+        db.execSQL("ALTER TABLE meter_new RENAME TO meter")
+    }
+}

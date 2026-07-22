@@ -59,11 +59,21 @@ data class MeterEntity(
     val normMilli: Long = 0,
 
     /**
-     * Day of month to remind about submitting readings (1..31), or 0 for a service that
-     * has nothing to submit - a normative service is billed whether you look at it or not.
+     * Day of month the bill is due/paid (1..31). Applies to every billing kind - even a
+     * metered service is paid on a date, not only read - and is what reminders count back from.
+     * The 31st clamps to the last day of a short month.
      */
-    @ColumnInfo(name = "reminder_day")
-    val reminderDay: Int,
+    // defaultValue mirrors the migration's DEFAULT so Room's schema check matches.
+    @ColumnInfo(name = "payment_day", defaultValue = "1")
+    val paymentDay: Int = 1,
+
+    /**
+     * Reminder lead times before [paymentDay], as a comma-separated list like a loan: "7,1"
+     * warns a week and a day ahead, null/empty means no reminder. Replaced the old single
+     * "reminder day" so any service - not just metered - can remind, and more than once.
+     */
+    @ColumnInfo(name = "reminder_days")
+    val reminderDays: String? = null,
 
     /** The user-made group this service is filed under, or null for ungrouped («Прочее»). */
     @ColumnInfo(name = "group_id")
@@ -74,4 +84,7 @@ data class MeterEntity(
 
     @ColumnInfo(name = "is_deleted")
     val isDeleted: Boolean = false,
-)
+) {
+    /** Lead times, furthest-out first, empty when reminders are off. */
+    val reminderDaysList: List<Int> get() = reminderDaysFromStored(reminderDays)
+}

@@ -38,6 +38,7 @@ import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.data.local.entity.MeterType
 import com.findev.fintrack.ui.ChipRow
 import com.findev.fintrack.ui.ConfirmDeleteDialog
+import com.findev.fintrack.ui.ReminderSection
 import com.findev.fintrack.ui.formatMinor
 
 /** Sentinel chip id for "no group" - ChipRow keys on strings, and null is not one. */
@@ -174,8 +175,8 @@ fun MeterFormScreen(
             }
 
             if (state.isNorm) {
-                // No readings to submit, so no reminder day: what is asked for instead is the
-                // fixed monthly volume, and what it costs is shown straight away.
+                // What a normative service asks for instead of readings: the fixed monthly
+                // volume, with its cost shown straight away.
                 AppTextField(
                     value = state.normText,
                     onValueChange = viewModel::onNormChange,
@@ -195,18 +196,26 @@ fun MeterFormScreen(
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }
-            } else if (state.isMetered) {
-                AppTextField(
-                    value = state.reminderDayText,
-                    onValueChange = viewModel::onReminderDayChange,
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.meter_reminder_day)) },
-                    supportingText = { Text(stringResource(R.string.meter_reminder_hint)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                )
             }
-            // FIXED needs nothing more - the amount above is the whole month.
+
+            // Payment day and reminders apply to every kind now: even a metered service is
+            // paid on a date, and a normative or fixed one is worth a nudge as much as a bill.
+            AppTextField(
+                value = state.paymentDayText,
+                onValueChange = viewModel::onPaymentDayChange,
+                singleLine = true,
+                label = { Text(stringResource(R.string.meter_payment_day)) },
+                supportingText = { Text(stringResource(R.string.meter_payment_day_hint)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            ReminderSection(
+                enabled = state.reminderEnabled,
+                selectedDays = state.reminderDays,
+                onEnabledChange = viewModel::onReminderEnabledChange,
+                onDayToggle = viewModel::onReminderDayToggle,
+            )
 
             // Groups are made on the ЖКХ screen; here a service just picks one, or none.
             if (state.groups.isNotEmpty()) {

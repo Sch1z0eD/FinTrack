@@ -86,7 +86,7 @@ fun UtilitiesScreen(
     // able to post - ask once one exists.
     NotificationPermissionRequest(
         needed = state.sections.any { section ->
-            section.items.any { it.meter.billing == BillingKind.METERED && it.meter.reminderDay in 1..31 }
+            section.items.any { it.meter.reminderDaysList.isNotEmpty() }
         },
     )
 

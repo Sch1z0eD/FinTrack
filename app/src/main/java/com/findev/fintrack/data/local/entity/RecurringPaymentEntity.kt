@@ -51,12 +51,20 @@ data class RecurringPaymentEntity(
     @ColumnInfo(name = "category_id")
     val categoryId: String,
 
-    @ColumnInfo(name = "reminder_enabled")
-    val reminderEnabled: Boolean = true,
+    /**
+     * Reminder lead times as a comma-separated list, like a loan: "7,1" reminds a week and a
+     * day before, null/empty means no reminder. Replaced the old on/off flag so a recurring
+     * payment can warn ahead, not only on the day.
+     */
+    @ColumnInfo(name = "reminder_days")
+    val reminderDays: String? = null,
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 
     @ColumnInfo(name = "is_deleted")
     val isDeleted: Boolean = false,
-)
+) {
+    /** Lead times, furthest-out first, empty when reminders are off. */
+    val reminderDaysList: List<Int> get() = reminderDaysFromStored(reminderDays)
+}

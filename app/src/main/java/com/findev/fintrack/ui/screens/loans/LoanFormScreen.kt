@@ -54,6 +54,7 @@ import com.findev.fintrack.ui.AppFilterChip
 import com.findev.fintrack.ui.AppTextField
 import com.findev.fintrack.ui.ChipRow
 import com.findev.fintrack.ui.PillSelector
+import com.findev.fintrack.ui.ReminderSection
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
@@ -391,77 +392,6 @@ fun LoanFormScreen(
         }
     }
 }
-
-/**
- * Reminder on/off plus how far ahead.
- *
- * The switch exists because the previous version had none: a reminder was turned off by
- * clearing the days field, which nobody discovers, so the screen read as having no
- * reminder setting at all. The presets cover what people actually pick; the field stays
- * for anything else.
- */
-@Composable
-private fun ReminderSection(
-    enabled: Boolean,
-    selectedDays: List<Int>,
-    onEnabledChange: (Boolean) -> Unit,
-    onDayToggle: (Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(FieldShape)
-            .toggleable(value = enabled, onValueChange = onEnabledChange, role = Role.Switch)
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.reminder_enabled),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        // Null: the row owns the gesture, so the switch must not claim it too.
-        Switch(checked = enabled, onCheckedChange = null)
-    }
-
-    AnimatedVisibility(visible = enabled) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            // Multi-select: one warning is either too early to act on or too late to move
-            // money, so "за неделю" and "за день" are meant to be picked together.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                REMINDER_PRESETS.forEach { (days, labelRes) ->
-                    AppFilterChip(
-                        selected = days in selectedDays,
-                        onClick = { onDayToggle(days) },
-                        label = { Text(stringResource(labelRes)) },
-                    )
-                }
-            }
-            if (selectedDays.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.reminder_pick_at_least_one),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-        }
-    }
-}
-
-/** Lead times worth one tap. Anything else goes in the field below them. */
-private val REMINDER_PRESETS = listOf(
-    0 to R.string.reminder_same_day,
-    1 to R.string.reminder_one_day,
-    3 to R.string.reminder_three_days,
-    7 to R.string.reminder_week,
-)
 
 /**
  * Which prepayment mode the contract allows.

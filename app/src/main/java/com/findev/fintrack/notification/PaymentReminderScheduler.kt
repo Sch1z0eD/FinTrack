@@ -81,24 +81,26 @@ class PaymentReminderScheduler @Inject constructor(
     /**
      * Every alarm is cancelled and only the live, reminder-enabled ones are set again.
      *
-     * Cancelling first - including for deleted rows - is what makes this a mirror rather
-     * than an accumulation: a payment that was deleted, or had its reminder switched off,
-     * or simply moved, must not leave yesterday's alarm behind to wake the phone about
-     * something that no longer exists.
+     * Cancelling first - including for deleted rows, and across every lead time the payment
+     * could ever have had - is what makes this a mirror rather than an accumulation: a
+     * payment that was deleted, had its reminder switched off, or dropped a lead time from the
+     * list must not leave yesterday's alarm behind to wake the phone about something gone.
      */
     private fun rescheduleAll(
         payments: List<RecurringPaymentEntity>,
         paidThrough: Map<String, Long>,
     ) {
         payments.forEach { payment ->
-            cancel(payment.id)
-            if (!payment.isDeleted && payment.reminderEnabled) {
-                schedule(payment, paidThrough[payment.id])
+            ALL_LEAD_TIMES.forEach { cancel(payment.id, it) }
+            if (!payment.isDeleted) {
+                payment.reminderDaysList.forEach { daysBefore ->
+                    schedule(payment, daysBefore, paidThrough[payment.id])
+                }
             }
         }
     }
 
-    private fun schedule(payment: RecurringPaymentEntity, paidThroughEpochDay: Long?) {
+    private fun schedule(payment: RecurringPaymentEntity, daysBefore: Int, paidThroughEpochDay: Long?) {
         val alarms = alarmManager ?: return
         val due = nextDueRecurrence(
             start = LocalDate.ofEpochDay(payment.startDateEpochDay),
@@ -108,17 +110,18 @@ class PaymentReminderScheduler @Inject constructor(
             today = LocalDate.now(),
         ) ?: return
 
-        val triggerAt = due.atTime(REMINDER_TIME)
+        val triggerAt = due.minusDays(daysBefore.toLong())
+            .atTime(REMINDER_TIME)
             .atZone(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
 
-        // An overdue payment's due date is in the past, and an alarm set in the past fires
-        // at once - which would mean a notification on every reschedule until it is paid.
-        // The card is already red; that is the reminder from here on.
+        // An alarm set in the past fires at once - which would mean a notification on every
+        // reschedule until it is paid. This covers both an overdue payment and a lead time
+        // whose window has already passed. The red card is the reminder from here on.
         if (triggerAt <= System.currentTimeMillis()) return
 
-        val pending = pendingIntent(payment, PendingIntent.FLAG_UPDATE_CURRENT)
+        val pending = pendingIntent(payment, daysBefore, PendingIntent.FLAG_UPDATE_CURRENT)
         if (canScheduleExact()) {
             alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
         } else {
@@ -128,11 +131,11 @@ class PaymentReminderScheduler @Inject constructor(
         }
     }
 
-    private fun cancel(paymentId: String) {
+    private fun cancel(paymentId: String, daysBefore: Int) {
         val alarms = alarmManager ?: return
         val existing = PendingIntent.getBroadcast(
             context,
-            paymentId.hashCode(),
+            requestCode(paymentId, daysBefore),
             Intent(context, PaymentReminderReceiver::class.java),
             PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -142,10 +145,12 @@ class PaymentReminderScheduler @Inject constructor(
         }
     }
 
-    private fun pendingIntent(payment: RecurringPaymentEntity, flag: Int): PendingIntent =
+    private fun pendingIntent(payment: RecurringPaymentEntity, daysBefore: Int, flag: Int): PendingIntent =
         PendingIntent.getBroadcast(
             context,
-            payment.id.hashCode(),
+            // The lead time is part of the identity: without it the week-ahead alarm and the
+            // day-before alarm share a request code and overwrite each other.
+            requestCode(payment.id, daysBefore),
             Intent(context, PaymentReminderReceiver::class.java).apply {
                 putExtra(EXTRA_PAYMENT_ID, payment.id)
                 putExtra(EXTRA_PAYMENT_NAME, payment.name)
@@ -159,4 +164,13 @@ class PaymentReminderScheduler @Inject constructor(
      * false, not an edge case.
      */
     private fun canScheduleExact(): Boolean = alarmManager?.canScheduleExactAlarms() == true
+
+    private fun requestCode(paymentId: String, daysBefore: Int): Int =
+        paymentId.hashCode() * 31 + daysBefore
 }
+
+/**
+ * Every lead time the UI can offer, walked on reschedule to cancel: a lead time the user has
+ * just removed is exactly the one whose alarm is still pending and no longer in the list.
+ */
+private val ALL_LEAD_TIMES = listOf(0, 1, 3, 7, 14, 30)

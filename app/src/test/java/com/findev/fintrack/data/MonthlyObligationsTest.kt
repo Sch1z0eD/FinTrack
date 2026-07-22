@@ -305,7 +305,7 @@ class MonthlyObligationsTest {
         billing = billing,
         tariffMinor = tariffMinor,
         normMilli = normMilli,
-        reminderDay = if (billing == BillingKind.METERED) 5 else 0,
+        paymentDay = 5,
         updatedAt = 0,
     )
 

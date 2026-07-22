@@ -3,6 +3,7 @@ package com.findev.fintrack.data
 import com.findev.fintrack.data.local.dao.RecurringPaymentDao
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
 import com.findev.fintrack.data.local.entity.RecurringPaymentEntity
+import com.findev.fintrack.data.local.entity.reminderDaysToStored
 import kotlinx.coroutines.flow.Flow
 import java.util.UUID
 import javax.inject.Inject
@@ -33,7 +34,7 @@ class RecurringPaymentRepository @Inject constructor(
         endDateEpochDay: Long?,
         accountId: String,
         categoryId: String,
-        reminderEnabled: Boolean,
+        reminderDays: List<Int>,
     ): String {
         val id = UUID.randomUUID().toString()
         recurringPaymentDao.insert(
@@ -46,7 +47,7 @@ class RecurringPaymentRepository @Inject constructor(
                 endDateEpochDay = endDateEpochDay,
                 accountId = accountId,
                 categoryId = categoryId,
-                reminderEnabled = reminderEnabled,
+                reminderDays = reminderDaysToStored(reminderDays),
                 updatedAt = System.currentTimeMillis(),
             ),
         )
@@ -62,7 +63,7 @@ class RecurringPaymentRepository @Inject constructor(
         endDateEpochDay: Long?,
         accountId: String,
         categoryId: String,
-        reminderEnabled: Boolean,
+        reminderDays: List<Int>,
     ) {
         val existing = requireNotNull(recurringPaymentDao.getById(id)) {
             "No recurring payment with id $id"
@@ -76,7 +77,7 @@ class RecurringPaymentRepository @Inject constructor(
                 endDateEpochDay = endDateEpochDay,
                 accountId = accountId,
                 categoryId = categoryId,
-                reminderEnabled = reminderEnabled,
+                reminderDays = reminderDaysToStored(reminderDays),
                 updatedAt = System.currentTimeMillis(),
             ),
         )
