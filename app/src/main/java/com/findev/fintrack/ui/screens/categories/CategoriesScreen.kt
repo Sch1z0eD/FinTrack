@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
@@ -27,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Scaffold
@@ -43,6 +45,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -58,9 +61,13 @@ import com.findev.fintrack.ui.AppMenu
 import com.findev.fintrack.ui.ConfirmDeleteDialog
 import com.findev.fintrack.ui.DraggableItem
 import com.findev.fintrack.ui.dragContainer
+import com.findev.fintrack.ui.formatMinor
 import com.findev.fintrack.ui.rememberDragDropState
 import com.findev.fintrack.ui.RowCorner
 import com.findev.fintrack.ui.panelSurface
+
+/** Amber for the "approaching the limit" budget bar; the M3 scheme has no caution colour. */
+private val BudgetWarnColor = Color(0xFFFFB300)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -158,6 +165,7 @@ fun CategoriesScreen(
                     is CatRow.Item -> DraggableItem(dragState, index) { isDragging ->
                         CategoryListRow(
                             category = row.category,
+                            spentThisMonthMinor = row.spentThisMonthMinor,
                             onEdit = { editing = row.category },
                             onArchiveToggle = {
                                 viewModel.onArchiveToggle(row.category.id, !row.category.isArchived)
@@ -179,8 +187,8 @@ fun CategoriesScreen(
         CategoryDialog(
             category = null,
             initialType = type,
-            onConfirm = { name, chosenType, icon, color ->
-                viewModel.onCreate(name, chosenType, icon, color)
+            onConfirm = { name, chosenType, icon, color, limit ->
+                viewModel.onCreate(name, chosenType, icon, color, limit)
                 creatingType = null
             },
             onDismiss = { creatingType = null },
@@ -191,8 +199,8 @@ fun CategoriesScreen(
         CategoryDialog(
             category = category,
             initialType = category.type,
-            onConfirm = { name, _, icon, color ->
-                viewModel.onSaveEdit(category.id, name, icon, color)
+            onConfirm = { name, _, icon, color, limit ->
+                viewModel.onSaveEdit(category.id, name, icon, color, limit)
                 editing = null
             },
             onDismiss = { editing = null },
@@ -221,27 +229,29 @@ private sealed interface CatRow {
         override val key get() = "empty-$titleRes"
     }
 
-    data class Item(val category: CategoryEntity) : CatRow {
+    /** [spentThisMonthMinor] drives the budget bar; it is 0 for income rows, which have no budget. */
+    data class Item(val category: CategoryEntity, val spentThisMonthMinor: Long) : CatRow {
         override val key get() = category.id
     }
 }
 
 /** Flattens the two typed lists into one drag-friendly sequence: header, its rows, next header… */
 private fun buildCategoryRows(
-    expense: List<CategoryEntity>,
+    expense: List<CategoryRow>,
     income: List<CategoryEntity>,
 ): List<CatRow> = buildList {
     add(CatRow.Header(R.string.categories_expense))
     if (expense.isEmpty()) add(CatRow.Empty(R.string.categories_expense))
-    else expense.forEach { add(CatRow.Item(it)) }
+    else expense.forEach { add(CatRow.Item(it.category, it.spentThisMonthMinor)) }
     add(CatRow.Header(R.string.categories_income))
     if (income.isEmpty()) add(CatRow.Empty(R.string.categories_income))
-    else income.forEach { add(CatRow.Item(it)) }
+    else income.forEach { add(CatRow.Item(it, 0L)) }
 }
 
 @Composable
 private fun CategoryListRow(
     category: CategoryEntity,
+    spentThisMonthMinor: Long,
     onEdit: () -> Unit,
     onArchiveToggle: () -> Unit,
     onDelete: () -> Unit,
@@ -286,6 +296,46 @@ private fun CategoryListRow(
                     text = stringResource(R.string.categories_archived),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            val limit = category.monthlyLimitMinor
+            if (limit != null && limit > 0) {
+                // Warn as the month's spending nears (>=80%, amber) and passes the limit (red).
+                val over = spentThisMonthMinor > limit
+                val near = !over && spentThisMonthMinor >= limit * 8 / 10
+                val barColor = when {
+                    over -> MaterialTheme.colorScheme.error
+                    near -> BudgetWarnColor
+                    else -> MaterialTheme.colorScheme.primary
+                }
+                LinearProgressIndicator(
+                    progress = { (spentThisMonthMinor.toFloat() / limit).coerceIn(0f, 1f) },
+                    color = barColor,
+                    trackColor = barColor.copy(alpha = 0.18f),
+                    // No gap or end dot: a plain filled bar reads cleaner at this small size.
+                    gapSize = 0.dp,
+                    drawStopIndicator = {},
+                    // Trailing space keeps the bar clear of the "..." button.
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp, end = 4.dp)
+                        .height(6.dp)
+                        .clip(CircleShape),
+                )
+                Text(
+                    text = stringResource(
+                        R.string.categories_budget_progress,
+                        stringResource(R.string.money_with_currency, formatMinor(spentThisMonthMinor)),
+                        stringResource(R.string.money_with_currency, formatMinor(limit)),
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (over) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(top = 2.dp),
                 )
             }
         }

@@ -12,6 +12,7 @@ import com.findev.fintrack.data.local.MIGRATION_6_7
 import com.findev.fintrack.data.local.MIGRATION_7_8
 import com.findev.fintrack.data.local.MIGRATION_8_9
 import com.findev.fintrack.data.local.MIGRATION_9_10
+import com.findev.fintrack.data.local.MIGRATION_10_11
 import com.findev.fintrack.data.local.SeedCategoriesCallback
 import com.findev.fintrack.data.local.dao.AccountDao
 import com.findev.fintrack.data.local.dao.CategoryDao
@@ -45,7 +46,7 @@ object DatabaseModule {
             // rather than quietly wipe the only copy of the user's data.
             .addMigrations(
                 MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
+                MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
             )
             .build()
 

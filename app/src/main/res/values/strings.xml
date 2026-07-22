@@ -437,6 +437,9 @@
     <string name="categories_name">Название</string>
     <string name="categories_icon">Эмодзи</string>
     <string name="categories_color">Цвет</string>
+    <string name="categories_monthly_limit">Месячный лимит (₽)</string>
+    <string name="categories_monthly_limit_hint">Пусто — без лимита</string>
+    <string name="categories_budget_progress">%1$s из %2$s</string>
     <string name="categories_archived">В архиве</string>
     <string name="categories_archive">В архив</string>
     <string name="categories_unarchive">Вернуть из архива</string>

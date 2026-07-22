@@ -30,7 +30,13 @@ class CategoryRepository @Inject constructor(
         return (expense.firstOrNull { it.icon == "💡" } ?: expense.firstOrNull())?.id
     }
 
-    suspend fun create(name: String, type: CategoryType, icon: String, color: Long): String {
+    suspend fun create(
+        name: String,
+        type: CategoryType,
+        icon: String,
+        color: Long,
+        monthlyLimitMinor: Long? = null,
+    ): String {
         val id = UUID.randomUUID().toString()
         categoryDao.insert(
             CategoryEntity(
@@ -39,6 +45,8 @@ class CategoryRepository @Inject constructor(
                 type = type,
                 icon = icon,
                 color = color,
+                // A limit only makes sense against spending; income categories never carry one.
+                monthlyLimitMinor = monthlyLimitMinor.takeIf { type == CategoryType.EXPENSE },
                 // New categories go to the end of their type's manual order.
                 position = categoryDao.nextPosition(type),
                 updatedAt = System.currentTimeMillis(),
@@ -59,13 +67,20 @@ class CategoryRepository @Inject constructor(
     }
 
     /** Type is intentionally not editable: it would move the category between grids. */
-    suspend fun update(id: String, name: String, icon: String, color: Long) {
+    suspend fun update(
+        id: String,
+        name: String,
+        icon: String,
+        color: Long,
+        monthlyLimitMinor: Long? = null,
+    ) {
         val existing = requireNotNull(categoryDao.getById(id)) { "No category with id $id" }
         categoryDao.update(
             existing.copy(
                 name = name,
                 icon = icon,
                 color = color,
+                monthlyLimitMinor = monthlyLimitMinor.takeIf { existing.type == CategoryType.EXPENSE },
                 updatedAt = System.currentTimeMillis(),
             ),
         )

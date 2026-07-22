@@ -41,6 +41,13 @@ data class CategoryEntity(
     @ColumnInfo(name = "position", defaultValue = "0")
     val position: Int = 0,
 
+    /**
+     * Monthly spending limit in kopecks, or null for no budget. Only meaningful for expense
+     * categories; the screen warns as the month's spending approaches and passes it.
+     */
+    @ColumnInfo(name = "monthly_limit_minor")
+    val monthlyLimitMinor: Long? = null,
+
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 

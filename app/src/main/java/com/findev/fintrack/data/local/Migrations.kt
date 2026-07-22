@@ -301,3 +301,15 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
         db.execSQL("ALTER TABLE meter_new RENAME TO meter")
     }
 }
+
+/**
+ * 10 -> 11: expense categories can carry a monthly spending limit.
+ *
+ * Nullable, so every existing category keeps "no budget" until one is set. A plain ADD COLUMN
+ * is enough - nothing to backfill and no default to declare for a nullable column.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE category ADD COLUMN monthly_limit_minor INTEGER")
+    }
+}

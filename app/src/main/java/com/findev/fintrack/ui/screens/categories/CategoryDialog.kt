@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.CategoryEntity
@@ -39,6 +41,9 @@ import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.fieldColors
+import com.findev.fintrack.ui.formatAmountForInput
+import com.findev.fintrack.ui.parseAmountToMinor
+import com.findev.fintrack.ui.sanitizeAmountInput
 
 /** Same palette the seeded categories use, so custom ones do not look foreign. */
 private val PALETTE = listOf(
@@ -53,13 +58,16 @@ fun CategoryDialog(
     category: CategoryEntity?,
     /** Preselected type for a new category; ignored when editing. */
     initialType: CategoryType,
-    onConfirm: (name: String, type: CategoryType, icon: String, color: Long) -> Unit,
+    onConfirm: (name: String, type: CategoryType, icon: String, color: Long, monthlyLimitMinor: Long?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(category?.name.orEmpty()) }
     var icon by remember { mutableStateOf(category?.icon ?: "🙂") }
     var color by remember { mutableLongStateOf(category?.color ?: PALETTE.first()) }
     var type by remember { mutableStateOf(category?.type ?: initialType) }
+    var limit by remember {
+        mutableStateOf(category?.monthlyLimitMinor?.let { formatAmountForInput(it) }.orEmpty())
+    }
 
     val trimmedName = name.trim()
     val trimmedIcon = icon.trim()
@@ -163,12 +171,37 @@ fun CategoryDialog(
                         ) {}
                     }
                 }
+
+                // A budget only applies to spending; the field is hidden for income categories.
+                if (type == CategoryType.EXPENSE) {
+                    TextField(
+                        value = limit,
+                        onValueChange = { limit = sanitizeAmountInput(it) },
+                        singleLine = true,
+                        shape = FieldShape,
+                        colors = fieldColors(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        label = { Text(stringResource(R.string.categories_monthly_limit)) },
+                        supportingText = { Text(stringResource(R.string.categories_monthly_limit_hint)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = trimmedName.isNotEmpty() && trimmedIcon.isNotEmpty(),
-                onClick = { onConfirm(trimmedName, type, trimmedIcon, color) },
+                onClick = {
+                    // A zero or blank limit means "no budget"; only expense categories carry one.
+                    val limitMinor = parseAmountToMinor(limit).takeIf { it > 0 }
+                    onConfirm(
+                        trimmedName,
+                        type,
+                        trimmedIcon,
+                        color,
+                        if (type == CategoryType.EXPENSE) limitMinor else null,
+                    )
+                },
             ) {
                 Text(
                     stringResource(
