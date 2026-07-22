@@ -17,12 +17,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -37,6 +39,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TextField
 import androidx.compose.material3.Scaffold
@@ -78,6 +81,7 @@ import com.findev.fintrack.ui.borderlessFilterChipColors
 import com.findev.fintrack.ui.dateLabel
 import com.findev.fintrack.ui.fieldColors
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.theme.BudgetColors
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
@@ -309,6 +313,17 @@ private fun QuickEntryContent(
                 )
             }
 
+            // Budget awareness right where the money is spent: once a limited category is picked,
+            // show what this entry does to its monthly budget before it is even saved.
+            val limit = state.selectedCategoryLimitMinor
+            if (!state.isTransfer && limit != null) {
+                CategoryBudgetHint(
+                    spentMinor = state.selectedCategorySpentMinor,
+                    addingMinor = state.amountMinor,
+                    limitMinor = limit,
+                )
+            }
+
             Button(
                 onClick = onSave,
                 enabled = state.canSave,
@@ -516,6 +531,61 @@ private fun CategoryGrid(
                 )
             }
         }
+    }
+}
+
+/**
+ * Compact budget readout for the selected expense category: a bar and a line showing how much
+ * of the monthly limit is left once the amount being entered is added, warning as it nears or
+ * passes the limit. Matches the categories screen's colours (blue / amber / red).
+ */
+@Composable
+private fun CategoryBudgetHint(
+    spentMinor: Long,
+    addingMinor: Long,
+    limitMinor: Long,
+) {
+    val projected = spentMinor + addingMinor
+    val over = projected > limitMinor
+    val near = !over && projected >= limitMinor * 8 / 10
+    val accent = when {
+        over -> MaterialTheme.colorScheme.error
+        near -> BudgetColors.warn
+        else -> MaterialTheme.colorScheme.primary
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = if (over) {
+                stringResource(
+                    R.string.quick_entry_budget_over,
+                    stringResource(R.string.money_with_currency, formatMinor(projected - limitMinor)),
+                )
+            } else {
+                stringResource(
+                    R.string.quick_entry_budget_left,
+                    stringResource(R.string.money_with_currency, formatMinor(limitMinor - projected)),
+                    stringResource(R.string.money_with_currency, formatMinor(limitMinor)),
+                )
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (over) accent else MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LinearProgressIndicator(
+            progress = { (projected.toFloat() / limitMinor).coerceIn(0f, 1f) },
+            color = accent,
+            trackColor = accent.copy(alpha = 0.18f),
+            gapSize = 0.dp,
+            drawStopIndicator = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(CircleShape),
+        )
     }
 }
 

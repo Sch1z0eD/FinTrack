@@ -150,6 +150,8 @@
     <string name="quick_entry_back">Назад</string>
     <string name="quick_entry_note">Комментарий</string>
     <string name="quick_entry_note_remove">Убрать комментарий</string>
+    <string name="quick_entry_budget_left">Останется %1$s из %2$s</string>
+    <string name="quick_entry_budget_over">Превышение лимита на %1$s</string>
     <string name="quick_entry_no_account">Сначала создайте счёт</string>
     <string name="quick_entry_no_account_action">Создать счёт</string>
 

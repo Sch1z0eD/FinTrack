@@ -65,9 +65,7 @@ import com.findev.fintrack.ui.formatMinor
 import com.findev.fintrack.ui.rememberDragDropState
 import com.findev.fintrack.ui.RowCorner
 import com.findev.fintrack.ui.panelSurface
-
-/** Amber for the "approaching the limit" budget bar; the M3 scheme has no caution colour. */
-private val BudgetWarnColor = Color(0xFFFFB300)
+import com.findev.fintrack.ui.theme.BudgetColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -306,7 +304,7 @@ private fun CategoryListRow(
                 val near = !over && spentThisMonthMinor >= limit * 8 / 10
                 val barColor = when {
                     over -> MaterialTheme.colorScheme.error
-                    near -> BudgetWarnColor
+                    near -> BudgetColors.warn
                     else -> MaterialTheme.colorScheme.primary
                 }
                 LinearProgressIndicator(

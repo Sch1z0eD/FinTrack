@@ -14,6 +14,7 @@ import com.findev.fintrack.ui.navigation.QUICK_ENTRY_ARG_TRANSACTION_ID
 import com.findev.fintrack.ui.formatAmountForInput
 import com.findev.fintrack.ui.parseAmountToMinor
 import com.findev.fintrack.ui.sanitizeAmountInput
+import com.findev.fintrack.ui.screens.overview.monthBounds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -44,6 +45,10 @@ data class QuickEntryUiState(
     val selectedToAccountId: String? = null,
     val dateEpochDay: Long = LocalDate.now().toEpochDay(),
     val note: String = "",
+    /** Monthly budget of the selected expense category, or null when it has none. */
+    val selectedCategoryLimitMinor: Long? = null,
+    /** Already spent in the selected category this month, before the amount being entered. */
+    val selectedCategorySpentMinor: Long = 0,
     /** False until the database has been read, so "no accounts yet" is not confused with "still loading". */
     val isLoaded: Boolean = false,
     /** True when an existing transaction is being edited rather than created. */
@@ -92,6 +97,15 @@ class QuickEntryViewModel @Inject constructor(
 
     private val input = MutableStateFlow(InputState())
 
+    // Budgets track the calendar month the entry screen is opened in.
+    private val month = monthBounds(LocalDate.now())
+
+    /**
+     * When editing an expense that already counts toward this month's spending, its own amount
+     * is subtracted from the category total so the "after this entry" projection is not doubled.
+     */
+    private var editedExpenseThisMonth: Pair<String, Long>? = null
+
     init {
         editedTransactionId?.let(::prefillFrom)
     }
@@ -99,6 +113,13 @@ class QuickEntryViewModel @Inject constructor(
     private fun prefillFrom(transactionId: String) {
         viewModelScope.launch {
             val existing = transactionRepository.getById(transactionId) ?: return@launch
+            val categoryId = existing.categoryId
+            if (existing.type == TransactionType.EXPENSE &&
+                categoryId != null &&
+                existing.dateEpochDay in month
+            ) {
+                editedExpenseThisMonth = categoryId to existing.amountMinor
+            }
             input.value = InputState(
                 amountText = formatAmountForInput(existing.amountMinor),
                 type = existing.type,
@@ -122,12 +143,24 @@ class QuickEntryViewModel @Inject constructor(
         .distinctUntilChanged()
         .flatMapLatest { type -> categoryRepository.observeByType(type.toCategoryType()) }
 
+    /** This month's spending per expense category, so the budget hint stays live while entering. */
+    private val monthlySpendingByCategory: Flow<Map<String, Long>> =
+        transactionRepository.observeExpensesByCategory(month.first, month.last)
+            .map { totals -> totals.associate { it.categoryId to it.totalMinor } }
+
     val uiState: kotlinx.coroutines.flow.StateFlow<QuickEntryUiState> = combine(
         input,
         // Archived accounts must not accept new transactions.
         accountRepository.observeActive(),
         categories,
-    ) { input, accounts, categories ->
+        monthlySpendingByCategory,
+    ) { input, accounts, categories, spending ->
+        val selectedCategory = categories.firstOrNull { it.id == input.selectedCategoryId }
+        // Exclude the edited transaction's own amount so its projection is not counted twice.
+        val editedSameCategory = editedExpenseThisMonth
+            ?.takeIf { it.first == input.selectedCategoryId }
+            ?.second ?: 0L
+        val spentThisMonth = (spending[input.selectedCategoryId] ?: 0L) - editedSameCategory
         QuickEntryUiState(
             amountMinor = parseAmountToMinor(input.amountText),
             amountText = input.amountText,
@@ -140,6 +173,8 @@ class QuickEntryViewModel @Inject constructor(
             selectedToAccountId = input.selectedToAccountId,
             dateEpochDay = input.dateEpochDay,
             note = input.note,
+            selectedCategoryLimitMinor = selectedCategory?.monthlyLimitMinor,
+            selectedCategorySpentMinor = spentThisMonth.coerceAtLeast(0L),
             isLoaded = true,
             isEditing = editedTransactionId != null,
         )

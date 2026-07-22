@@ -120,6 +120,18 @@ object MoneyColors {
 }
 
 /**
+ * Amber caution for a budget nearing its limit. Like [MoneyColors] this is a meaning, not a
+ * brand accent: the scheme has no warning role, and "close to the limit" must read the same in
+ * both themes. Only lightness differs so it stays legible on each background.
+ */
+object BudgetColors {
+    private val WarnLight = Color(0xFFB26A00)
+    private val WarnDark = Color(0xFFFFB300)
+
+    val warn: Color @Composable get() = if (onDarkSurface()) WarnDark else WarnLight
+}
+
+/**
  * Whether the theme currently in force is a dark one.
  *
  * Read off the surface colour rather than from isSystemInDarkTheme(): the app has its own
