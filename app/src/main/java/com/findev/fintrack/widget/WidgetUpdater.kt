@@ -9,7 +9,6 @@ import com.findev.fintrack.ui.screens.overview.monthBounds
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import java.time.LocalDate
@@ -17,8 +16,12 @@ import javax.inject.Inject
 
 /**
  * Keeps the home-screen widgets in step with the data while the app process is alive. Each
- * widget watches only what it shows and repaints when that changes. The first emission is
- * dropped: each widget already loaded that snapshot itself when it was composed.
+ * widget watches only what it shows and repaints when that changes.
+ *
+ * The first emission is pushed too, not dropped: a widget only re-composes itself on a system
+ * update or when it is placed, so after the process restarts (or the app is reinstalled) its
+ * painted snapshot can be stale - it was showing 0 ₽ long after the balance had moved. Syncing
+ * the current value on every app start is what makes the widget catch up.
  */
 class WidgetUpdater @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -38,14 +41,12 @@ class WidgetUpdater @Inject constructor(
         ) { balance, totals, obligations ->
             Triple(balance, totals.expenseMinor, obligations)
         }
-            .drop(1)
             .onEach { BalanceWidget().updateAll(context) }
             .launchIn(scope)
 
         // Payments widget: it lists several rows, so it has to watch all of them - keying on
         // the soonest alone would leave a stale list when a later payment changes.
         nextPaymentRepository.observeUpcoming(LocalDate.now(), limit = UPCOMING_ROWS)
-            .drop(1)
             .onEach { NextPaymentWidget().updateAll(context) }
             .launchIn(scope)
     }

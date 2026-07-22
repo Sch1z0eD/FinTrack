@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- No stroke: the 1dp border read as a hard edge/frame around the widget; depth is left to
+     the fill alone, matching the borderless surfaces in the app. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <corners android:radius="24dp" />
     <solid android:color="@color/widget_glass_fill" />
-    <stroke
-        android:width="1dp"
-        android:color="@color/widget_glass_stroke" />
 </shape>

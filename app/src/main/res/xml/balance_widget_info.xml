@@ -8,7 +8,7 @@
     android:maxResizeHeight="300dp"
     android:description="@string/widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"
-    android:previewLayout="@layout/glance_default_loading_layout"
+    android:previewLayout="@layout/widget_balance_preview"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen" />
