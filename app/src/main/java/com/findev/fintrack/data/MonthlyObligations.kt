@@ -1,5 +1,8 @@
 package com.findev.fintrack.data
 
+import com.findev.fintrack.data.local.entity.BillingKind
+import com.findev.fintrack.data.local.entity.MeterEntity
+import com.findev.fintrack.data.local.entity.MeterReadingEntity
 import com.findev.fintrack.data.local.entity.RecurringPaymentEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -17,6 +20,8 @@ import javax.inject.Inject
 data class MonthlyObligations(
     val loansMinor: Long = 0,
     val recurringMinor: Long = 0,
+    /** ЖКХ this month: fixed and normative services plus metered readings entered in it. */
+    val utilitiesMinor: Long = 0,
     /** Money that actually left the accounts towards this month's obligations. */
     val paidMinor: Long = 0,
     /**
@@ -27,7 +32,7 @@ data class MonthlyObligations(
      */
     val remainingMinor: Long = 0,
 ) {
-    val totalMinor: Long get() = loansMinor + recurringMinor
+    val totalMinor: Long get() = loansMinor + recurringMinor + utilitiesMinor
 }
 
 /**
@@ -37,15 +42,22 @@ data class MonthlyObligations(
 class ObligationsRepository @Inject constructor(
     private val loanRepository: LoanRepository,
     private val recurringPaymentRepository: RecurringPaymentRepository,
+    private val meterRepository: MeterRepository,
     private val transactionRepository: TransactionRepository,
 ) {
     fun observeForMonth(month: LongRange): Flow<MonthlyObligations> = combine(
         loanRepository.observeAllWithSchedules(),
         recurringPaymentRepository.observeAll(),
+        // Meters and their readings arrive as one pair so the five-arg combine still fits.
+        combine(
+            meterRepository.observeAll(),
+            meterRepository.observeAllReadings(),
+        ) { meters, readings -> meters to readings },
         transactionRepository.observePaidThrough(),
         transactionRepository.observeSettledAmounts(),
-    ) { loans, recurring, paidThrough, paidAmounts ->
-        monthlyObligations(loans, recurring, paidThrough, paidAmounts, month)
+    ) { loans, recurring, metersAndReadings, paidThrough, paidAmounts ->
+        val (meters, readings) = metersAndReadings
+        monthlyObligations(loans, recurring, paidThrough, paidAmounts, month, meters, readings)
     }
 }
 
@@ -88,9 +100,13 @@ fun monthlyObligations(
     paidThrough: Map<String, Long>,
     paidAmounts: Map<Pair<String, Long>, Long>,
     month: LongRange,
+    // Defaulted and last so the many existing loan/recurring call sites stay valid.
+    meters: List<MeterEntity> = emptyList(),
+    readings: List<MeterReadingEntity> = emptyList(),
 ): MonthlyObligations {
     var loansMinor = 0L
     var recurringMinor = 0L
+    var utilitiesMinor = 0L
     var paidMinor = 0L
     var remainingMinor = 0L
 
@@ -119,12 +135,58 @@ fun monthlyObligations(
         }
     }
 
+    // The 1st of the shown month, used as the settle key for a monthly (norm/fixed) service -
+    // the same key UtilitiesViewModel pays it under.
+    val firstOfMonth = LocalDate.ofEpochDay(month.first).withDayOfMonth(1).toEpochDay()
+    val latestReadingByMeter = readings.groupBy { it.meterId }
+    meters.forEach { meter ->
+        val charge = utilityChargeInMonth(meter, latestReadingByMeter[meter.id], month, firstOfMonth)
+            ?: return@forEach
+        val paid = paidAmounts[charge.settlesId to charge.dueEpochDay] ?: 0
+        val closed = when (meter.billing) {
+            // A metered reading is settled outright, keyed by the reading itself.
+            BillingKind.METERED -> paidThrough.containsKey(charge.settlesId)
+            // A monthly service is paid for a month; closed once that month is settled.
+            else -> paidThrough[meter.id]?.let { it in month } == true
+        }
+        utilitiesMinor += effectiveAmount(charge.scheduledMinor, paid, closed)
+        paidMinor += paid
+        if (!closed) remainingMinor += charge.scheduledMinor
+    }
+
     return MonthlyObligations(
         loansMinor = loansMinor,
         recurringMinor = recurringMinor,
+        utilitiesMinor = utilitiesMinor,
         paidMinor = paidMinor,
         remainingMinor = remainingMinor,
     )
+}
+
+/** What one service owes in [month], or null when there is nothing to pay for it yet. */
+private class UtilityCharge(
+    val settlesId: String,
+    val dueEpochDay: Long,
+    val scheduledMinor: Long,
+)
+
+private fun utilityChargeInMonth(
+    meter: MeterEntity,
+    meterReadings: List<MeterReadingEntity>?,
+    month: LongRange,
+    firstOfMonth: Long,
+): UtilityCharge? = when (meter.billing) {
+    // Norm and fixed cost the same every month, keyed by the meter and the 1st.
+    BillingKind.NORM, BillingKind.FIXED ->
+        meter.monthlyChargeMinor()
+            ?.takeIf { it > 0 }
+            ?.let { UtilityCharge(meter.id, firstOfMonth, it) }
+    // Metered: the latest reading counts only if it was taken in this month - a reading
+    // from an earlier month belongs to that month's bill, not this one.
+    BillingKind.METERED -> meterReadings
+        ?.maxByOrNull { it.dateEpochDay }
+        ?.takeIf { it.dateEpochDay in month && it.amountMinor > 0 }
+        ?.let { UtilityCharge(it.id, it.dateEpochDay, it.amountMinor) }
 }
 
 /**

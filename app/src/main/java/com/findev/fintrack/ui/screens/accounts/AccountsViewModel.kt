@@ -82,4 +82,9 @@ class AccountsViewModel @Inject constructor(
             }
         }
     }
+
+    /** Persists a new account order after a drag; [orderedIds] is the full list, top to bottom. */
+    fun onReorder(orderedIds: List<String>) {
+        viewModelScope.launch { accountRepository.reorder(orderedIds) }
+    }
 }

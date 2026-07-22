@@ -208,7 +208,14 @@ fun FinTrackNavHost(
                 },
             ),
         ) {
-            MeterFormScreen(onDone = { navController.popBackStack() })
+            MeterFormScreen(
+                onDone = { navController.popBackStack() },
+                // Deleting the meter kills the detail screen underneath, so land back on the
+                // list rather than popping onto an empty detail.
+                onDeleted = {
+                    navController.popBackStack(FinTrackDestination.UTILITIES.route, inclusive = false)
+                },
+            )
         }
         composable(
             route = QUICK_ENTRY_ROUTE_PATTERN,

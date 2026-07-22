@@ -72,7 +72,7 @@ interface OverviewDao {
             AS balance_minor
         FROM account a
         WHERE a.is_deleted = 0
-        ORDER BY a.is_archived, a.name
+        ORDER BY a.is_archived, a.position, a.name
         """,
     )
     fun observeAccountBalances(): Flow<List<AccountBalance>>

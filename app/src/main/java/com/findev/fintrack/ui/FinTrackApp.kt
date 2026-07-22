@@ -2,7 +2,6 @@ package com.findev.fintrack.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -156,9 +155,9 @@ private fun GlassBottomBar(
     val blurPx = with(LocalDensity.current) { BarBlurRadius.toPx() }
     var barOrigin by remember { mutableStateOf(Offset.Zero) }
 
-    // Tint over the blur: without it the glass reads as muddy rather than frosted.
-    val scrim = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)
-    val hairline = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)
+    // Tint over the blur: without it the glass reads as muddy rather than frosted. A higher
+    // tonal step than plain surface keeps the bar a touch lighter than the screen behind it.
+    val scrim = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.62f)
 
     Row(
         modifier = modifier
@@ -177,8 +176,9 @@ private fun GlassBottomBar(
                 // slice up with the clip before drawing.
                 translate(-barOrigin.x, -barOrigin.y) { drawLayer(blurred) }
                 drawRect(scrim)
-            }
-            .border(width = 1.dp, color = hairline, shape = shape),
+            },
+        // No hairline border: like the dialogs in Этап 14, the 1dp outline read as a grey
+        // frame around the bar rather than a glass edge. Depth is left to the blur and shadow.
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {

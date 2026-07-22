@@ -56,7 +56,9 @@ import com.patrykandpatrick.vico.compose.cartesian.layer.ColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
 import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
 import com.patrykandpatrick.vico.compose.common.Fill
+import com.patrykandpatrick.vico.compose.common.ProvideVicoTheme
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.patrykandpatrick.vico.compose.m3.common.rememberM3VicoTheme
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -328,17 +330,22 @@ private fun MonthlyChart(months: List<MonthlyBar>, categoryColor: Long?) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        CartesianChartHost(
-            chart = rememberCartesianChart(
-                rememberColumnCartesianLayer(columnProvider = columnProvider),
-                startAxis = VerticalAxis.rememberStart(),
-                bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = bottomFormatter),
-            ),
-            modelProducer = modelProducer,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp),
-        )
+        // Vico's own theme colours axis labels for a dark background, so on the light theme
+        // the month names and values came out near-white and vanished. The M3 theme ties the
+        // text to onBackground instead, so labels track the app theme both ways.
+        ProvideVicoTheme(rememberM3VicoTheme()) {
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberColumnCartesianLayer(columnProvider = columnProvider),
+                    startAxis = VerticalAxis.rememberStart(),
+                    bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = bottomFormatter),
+                ),
+                modelProducer = modelProducer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp),
+            )
+        }
         if (singleColor == null) {
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 SeriesKey(color = incomeColor, label = stringResource(R.string.stats_income))

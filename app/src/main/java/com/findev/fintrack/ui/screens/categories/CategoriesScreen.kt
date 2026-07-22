@@ -14,7 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,9 +39,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
@@ -52,6 +55,10 @@ import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.CategoryType
 import com.findev.fintrack.ui.AppMenu
+import com.findev.fintrack.ui.ConfirmDeleteDialog
+import com.findev.fintrack.ui.DraggableItem
+import com.findev.fintrack.ui.dragContainer
+import com.findev.fintrack.ui.rememberDragDropState
 import com.findev.fintrack.ui.RowCorner
 import com.findev.fintrack.ui.panelSurface
 
@@ -66,6 +73,7 @@ fun CategoriesScreen(
 
     var editing by remember { mutableStateOf<CategoryEntity?>(null) }
     var creatingType by remember { mutableStateOf<CategoryType?>(null) }
+    var pendingDelete by remember { mutableStateOf<CategoryEntity?>(null) }
 
     val blockedMessage = stringResource(R.string.categories_delete_blocked)
     LaunchedEffect(Unit) {
@@ -96,28 +104,74 @@ fun CategoriesScreen(
             }
         },
     ) { innerPadding ->
+        // A local copy the drag reorders optimistically; it tracks the source lists whenever a
+        // drag is not in progress, and the new order is persisted per type on drop.
+        var localRows by remember { mutableStateOf(emptyList<CatRow>()) }
+        val listState = rememberLazyListState()
+        val dragState = rememberDragDropState(listState) { from, to ->
+            val fromRow = localRows.getOrNull(from) as? CatRow.Item ?: return@rememberDragDropState
+            val toRow = localRows.getOrNull(to) as? CatRow.Item ?: return@rememberDragDropState
+            // Expense and income are separate grids; a header sits between them as a barrier.
+            if (fromRow.category.type != toRow.category.type) return@rememberDragDropState
+            localRows = localRows.toMutableList().apply { add(to, removeAt(from)) }
+        }
+        LaunchedEffect(state.expense, state.income) {
+            if (dragState.draggingItemIndex == null) {
+                localRows = buildCategoryRows(state.expense, state.income)
+            }
+        }
+        val persistOrder by rememberUpdatedState {
+            // Each type's categories, in their current on-screen order.
+            CategoryType.entries.forEach { type ->
+                viewModel.onReorder(
+                    localRows.filterIsInstance<CatRow.Item>()
+                        .filter { it.category.type == type }
+                        .map { it.category.id },
+                )
+            }
+        }
+
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .dragContainer(dragState, onDragEnd = { persistOrder() }),
             // Room for the FAB: without it the last row's "..." sits under the button.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            categorySection(
-                titleRes = R.string.categories_expense,
-                categories = state.expense,
-                onEdit = { editing = it },
-                onArchiveToggle = { viewModel.onArchiveToggle(it.id, !it.isArchived) },
-                onDelete = { viewModel.onDelete(it.id) },
-            )
-            categorySection(
-                titleRes = R.string.categories_income,
-                categories = state.income,
-                onEdit = { editing = it },
-                onArchiveToggle = { viewModel.onArchiveToggle(it.id, !it.isArchived) },
-                onDelete = { viewModel.onDelete(it.id) },
-            )
+            itemsIndexed(localRows, key = { _, row -> row.key }) { index, row ->
+                when (row) {
+                    is CatRow.Header -> Text(
+                        text = stringResource(row.titleRes),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                    )
+                    is CatRow.Empty -> Text(
+                        text = stringResource(R.string.categories_empty_type),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                    is CatRow.Item -> DraggableItem(dragState, index) { isDragging ->
+                        CategoryListRow(
+                            category = row.category,
+                            onEdit = { editing = row.category },
+                            onArchiveToggle = {
+                                viewModel.onArchiveToggle(row.category.id, !row.category.isArchived)
+                            },
+                            onDelete = { pendingDelete = row.category },
+                            // The lifted row gets a shadow so it reads as picked up.
+                            modifier = Modifier.shadow(
+                                elevation = if (isDragging) 8.dp else 0.dp,
+                                shape = RoundedCornerShape(RowCorner),
+                            ),
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -144,43 +198,45 @@ fun CategoriesScreen(
             onDismiss = { editing = null },
         )
     }
+
+    pendingDelete?.let { category ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.categories_delete_title),
+            message = stringResource(R.string.categories_delete_confirm, category.name),
+            onConfirm = { viewModel.onDelete(category.id) },
+            onDismiss = { pendingDelete = null },
+        )
+    }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.categorySection(
-    titleRes: Int,
-    categories: List<CategoryEntity>,
-    onEdit: (CategoryEntity) -> Unit,
-    onArchiveToggle: (CategoryEntity) -> Unit,
-    onDelete: (CategoryEntity) -> Unit,
-) {
-    item(key = "header-$titleRes") {
-        Text(
-            text = stringResource(titleRes),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
-        )
+/** One row of the categories list: a section header, an empty-section note, or a category. */
+private sealed interface CatRow {
+    val key: Any
+
+    data class Header(val titleRes: Int) : CatRow {
+        override val key get() = "header-$titleRes"
     }
-    if (categories.isEmpty()) {
-        item(key = "empty-$titleRes") {
-            Text(
-                text = stringResource(R.string.categories_empty_type),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        }
+
+    data class Empty(val titleRes: Int) : CatRow {
+        override val key get() = "empty-$titleRes"
     }
-    items(categories, key = { it.id }) { category ->
-        CategoryListRow(
-            category = category,
-            onEdit = { onEdit(category) },
-            onArchiveToggle = { onArchiveToggle(category) },
-            onDelete = { onDelete(category) },
-            // Archiving moves a row between sections; animate rather than teleport.
-            modifier = Modifier.animateItem(),
-        )
+
+    data class Item(val category: CategoryEntity) : CatRow {
+        override val key get() = category.id
     }
+}
+
+/** Flattens the two typed lists into one drag-friendly sequence: header, its rows, next header… */
+private fun buildCategoryRows(
+    expense: List<CategoryEntity>,
+    income: List<CategoryEntity>,
+): List<CatRow> = buildList {
+    add(CatRow.Header(R.string.categories_expense))
+    if (expense.isEmpty()) add(CatRow.Empty(R.string.categories_expense))
+    else expense.forEach { add(CatRow.Item(it)) }
+    add(CatRow.Header(R.string.categories_income))
+    if (income.isEmpty()) add(CatRow.Empty(R.string.categories_income))
+    else income.forEach { add(CatRow.Item(it)) }
 }
 
 @Composable

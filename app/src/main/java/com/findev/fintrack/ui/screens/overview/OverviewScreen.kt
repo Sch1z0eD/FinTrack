@@ -414,6 +414,12 @@ private fun ObligationsCard(obligations: MonthlyObligations) {
                     amountMinor = obligations.recurringMinor,
                 )
             }
+            if (obligations.utilitiesMinor > 0) {
+                ObligationRow(
+                    label = stringResource(R.string.overview_obligations_utilities),
+                    amountMinor = obligations.utilitiesMinor,
+                )
+            }
         }
     }
 }

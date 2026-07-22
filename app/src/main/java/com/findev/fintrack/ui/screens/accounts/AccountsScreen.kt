@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,9 +36,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +50,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.ui.AppMenu
+import com.findev.fintrack.ui.ConfirmDeleteDialog
+import com.findev.fintrack.ui.DraggableItem
+import com.findev.fintrack.ui.dragContainer
 import com.findev.fintrack.ui.formatMinor
+import com.findev.fintrack.ui.rememberDragDropState
 import com.findev.fintrack.ui.RowCorner
 import com.findev.fintrack.ui.panelSurface
 
@@ -63,6 +70,7 @@ fun AccountsScreen(
     // The whole row, not just the account: the dialog also shows the computed balance.
     var editing by remember { mutableStateOf<AccountRow?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var pendingDelete by remember { mutableStateOf<AccountRow?>(null) }
 
     val blockedMessage = stringResource(R.string.accounts_delete_blocked)
     LaunchedEffect(Unit) {
@@ -101,23 +109,47 @@ fun AccountsScreen(
             if (state.isEmpty) {
                 EmptyAccounts()
             } else {
+                // A local copy the drag can reorder optimistically; it tracks the source list
+                // whenever a drag is not in progress, and the reorder is persisted on drop.
+                var localRows by remember { mutableStateOf(state.rows) }
+                val listState = rememberLazyListState()
+                val dragState = rememberDragDropState(listState) { from, to ->
+                    val fromRow = localRows.getOrNull(from) ?: return@rememberDragDropState
+                    val toRow = localRows.getOrNull(to) ?: return@rememberDragDropState
+                    // Active and archived are separate sections; dragging across is not a move.
+                    if (fromRow.account.isArchived != toRow.account.isArchived) return@rememberDragDropState
+                    localRows = localRows.toMutableList().apply { add(to, removeAt(from)) }
+                }
+                LaunchedEffect(state.rows) {
+                    if (dragState.draggingItemIndex == null) localRows = state.rows
+                }
+                val currentOrder by rememberUpdatedState(localRows.map { it.account.id })
+
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .dragContainer(dragState, onDragEnd = { viewModel.onReorder(currentOrder) }),
                     // Room for the FAB: without it the last row's "..." sits under the button.
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(state.rows, key = { it.account.id }) { row ->
-                        AccountListRow(
-                            row = row,
-                            onEdit = { editing = row },
-                            onArchiveToggle = {
-                                viewModel.onArchiveToggle(row.account.id, !row.account.isArchived)
-                            },
-                            onDelete = { viewModel.onDelete(row.account.id) },
-                            // Archiving reorders the list; without this rows teleport.
-                            modifier = Modifier.animateItem(),
-                        )
+                    itemsIndexed(localRows, key = { _, it -> it.account.id }) { index, row ->
+                        DraggableItem(dragState, index) { isDragging ->
+                            AccountListRow(
+                                row = row,
+                                onEdit = { editing = row },
+                                onArchiveToggle = {
+                                    viewModel.onArchiveToggle(row.account.id, !row.account.isArchived)
+                                },
+                                onDelete = { pendingDelete = row },
+                                // The lifted row gets a shadow so it reads as picked up.
+                                modifier = Modifier.shadow(
+                                    elevation = if (isDragging) 8.dp else 0.dp,
+                                    shape = RoundedCornerShape(RowCorner),
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -145,6 +177,15 @@ fun AccountsScreen(
                 editing = null
             },
             onDismiss = { editing = null },
+        )
+    }
+
+    pendingDelete?.let { row ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.accounts_delete_title),
+            message = stringResource(R.string.accounts_delete_confirm, row.account.name),
+            onConfirm = { viewModel.onDelete(row.account.id) },
+            onDismiss = { pendingDelete = null },
         )
     }
 }

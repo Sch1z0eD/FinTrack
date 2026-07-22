@@ -5,9 +5,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -262,11 +262,15 @@ private fun QuickEntryContent(
                 )
             }
 
-            // Sliding the field in beats having the grid below it jump on every toggle.
+            // Height-only drawer, no fade: a fade reaches near-invisible by the midpoint while
+            // the height is still collapsing, so the field looked gone and then the grid kept
+            // "arriving" into place - the two-stage jerk. Animating height alone moves the field
+            // and the grid below it as one motion, start to finish.
+            val noteAnim = tween<IntSize>(durationMillis = 200)
             AnimatedVisibility(
                 visible = noteVisible,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
+                enter = expandVertically(animationSpec = noteAnim),
+                exit = shrinkVertically(animationSpec = noteAnim),
             ) {
                 TextField(
                     value = state.note,

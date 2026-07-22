@@ -129,7 +129,12 @@ fun CategoryDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
+                        .horizontalScroll(rememberScrollState())
+                        // The selected swatch scales up past its box (draw-only), and the
+                        // scroll viewport clips that overflow - so the first and last swatches
+                        // lost an edge when picked. Inner padding gives the growth room to spill
+                        // into instead of being cut off.
+                        .padding(horizontal = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     PALETTE.forEach { swatch ->

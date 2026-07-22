@@ -185,7 +185,12 @@ class LoanFormViewModel @Inject constructor(
 
     fun onRateChange(text: String) = _uiState.update { it.copy(rateText = sanitizeRateInput(text)) }
 
-    fun onStartDateChange(epochDay: Long) = _uiState.update { it.copy(startDateEpochDay = epochDay) }
+    fun onStartDateChange(epochDay: Long) = _uiState.update {
+        // The first payment must stay strictly after the start; if moving the start swallows
+        // it, drop it back to the default rather than keep a combination the engine rejects.
+        val firstPayment = it.firstPaymentEpochDay?.takeIf { first -> first > epochDay }
+        it.copy(startDateEpochDay = epochDay, firstPaymentEpochDay = firstPayment)
+    }
 
     /** Null clears it, putting the first payment back one month after the loan. */
     fun onFirstPaymentDateChange(epochDay: Long?) = _uiState.update {

@@ -91,6 +91,16 @@ data class TransactionEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 
+    /**
+     * When the row was first entered, never changed afterwards. The feed sorts a day's rows by
+     * it rather than by [updatedAt], so deleting and undoing (or editing) a transaction no
+     * longer jumps it to the top of its day - it returns to where it was.
+     */
+    // defaultValue mirrors the migration's DEFAULT 0 so Room's schema check matches; the
+    // migration backfills it from updated_at and every insert sets it explicitly.
+    @ColumnInfo(name = "created_at", defaultValue = "0")
+    val createdAt: Long,
+
     @ColumnInfo(name = "is_deleted")
     val isDeleted: Boolean = false,
 )

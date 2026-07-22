@@ -24,6 +24,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,6 +37,7 @@ import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.data.local.entity.MeterType
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.ConfirmDeleteDialog
 import com.findev.fintrack.ui.formatMinor
 
 /** Sentinel chip id for "no group" - ChipRow keys on strings, and null is not one. */
@@ -43,11 +47,14 @@ private const val NO_GROUP_ID = ""
 @Composable
 fun MeterFormScreen(
     onDone: () -> Unit,
+    onDeleted: () -> Unit,
     viewModel: MeterFormViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.saved.collect { onDone() } }
+    LaunchedEffect(Unit) { viewModel.deleted.collect { onDeleted() } }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -71,7 +78,7 @@ fun MeterFormScreen(
                 },
                 actions = {
                     if (state.isEditing) {
-                        IconButton(onClick = viewModel::onDelete) {
+                        IconButton(onClick = { confirmDelete = true }) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.meter_delete),
@@ -226,5 +233,14 @@ fun MeterFormScreen(
                 Text(stringResource(R.string.loan_save))
             }
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.meter_delete),
+            message = stringResource(R.string.meter_delete_confirm, state.name),
+            onConfirm = viewModel::onDelete,
+            onDismiss = { confirmDelete = false },
+        )
     }
 }

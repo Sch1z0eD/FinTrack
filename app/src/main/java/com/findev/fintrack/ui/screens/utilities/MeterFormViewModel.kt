@@ -92,6 +92,12 @@ class MeterFormViewModel @Inject constructor(
     private val savedChannel = Channel<Unit>(Channel.BUFFERED)
     val saved: Flow<Unit> = savedChannel.receiveAsFlow()
 
+    // Deletion is a separate signal from saving: a saved meter still exists, so returning to
+    // its detail screen is fine, but a deleted one leaves that screen with nothing to show -
+    // navigation has to skip past it back to the list.
+    private val deletedChannel = Channel<Unit>(Channel.BUFFERED)
+    val deleted: Flow<Unit> = deletedChannel.receiveAsFlow()
+
     init {
         // Merged with copy(), not by replacing state, so it and the edit-load below can land
         // in either order without one clobbering the other.
@@ -183,7 +189,7 @@ class MeterFormViewModel @Inject constructor(
         val id = editedId ?: return
         viewModelScope.launch {
             meterRepository.delete(id)
-            savedChannel.send(Unit)
+            deletedChannel.send(Unit)
         }
     }
 }

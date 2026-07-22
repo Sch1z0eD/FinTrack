@@ -39,10 +39,23 @@ class CategoryRepository @Inject constructor(
                 type = type,
                 icon = icon,
                 color = color,
+                // New categories go to the end of their type's manual order.
+                position = categoryDao.nextPosition(type),
                 updatedAt = System.currentTimeMillis(),
             ),
         )
         return id
+    }
+
+    /**
+     * Writes [orderedIds] as the new order, renumbering to 0..n-1. The caller passes the full
+     * desired order of one type's categories; positions stay contiguous within the type.
+     */
+    suspend fun reorder(orderedIds: List<String>) {
+        val now = System.currentTimeMillis()
+        orderedIds.forEachIndexed { index, id ->
+            categoryDao.updatePosition(id, index, now)
+        }
     }
 
     /** Type is intentionally not editable: it would move the category between grids. */

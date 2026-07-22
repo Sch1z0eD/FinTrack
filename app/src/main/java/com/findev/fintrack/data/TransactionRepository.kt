@@ -104,6 +104,7 @@ class TransactionRepository @Inject constructor(
         }
 
         val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
         transactionDao.insert(
             TransactionEntity(
                 id = id,
@@ -116,7 +117,8 @@ class TransactionRepository @Inject constructor(
                 settlesPaymentId = settlesPaymentId,
                 settlesDueEpochDay = settlesDueEpochDay,
                 settlesPartial = settlesPartial,
-                updatedAt = System.currentTimeMillis(),
+                updatedAt = now,
+                createdAt = now,
             ),
         )
         return id
@@ -147,6 +149,7 @@ class TransactionRepository @Inject constructor(
         }
 
         val id = UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
         transactionDao.insert(
             TransactionEntity(
                 id = id,
@@ -157,7 +160,8 @@ class TransactionRepository @Inject constructor(
                 categoryId = null,
                 dateEpochDay = dateEpochDay,
                 note = note,
-                updatedAt = System.currentTimeMillis(),
+                updatedAt = now,
+                createdAt = now,
             ),
         )
         return id

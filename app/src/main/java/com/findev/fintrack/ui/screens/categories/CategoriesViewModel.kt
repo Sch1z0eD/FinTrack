@@ -68,4 +68,9 @@ class CategoriesViewModel @Inject constructor(
             }
         }
     }
+
+    /** Persists a new order for one type's categories after a drag; [orderedIds] top to bottom. */
+    fun onReorder(orderedIds: List<String>) {
+        viewModelScope.launch { categoryRepository.reorder(orderedIds) }
+    }
 }

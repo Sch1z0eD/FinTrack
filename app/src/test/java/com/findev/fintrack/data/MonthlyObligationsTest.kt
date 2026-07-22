@@ -1,7 +1,11 @@
 package com.findev.fintrack.data
 
+import com.findev.fintrack.data.local.entity.BillingKind
 import com.findev.fintrack.data.local.entity.LoanEntity
 import com.findev.fintrack.data.local.entity.LoanType
+import com.findev.fintrack.data.local.entity.MeterEntity
+import com.findev.fintrack.data.local.entity.MeterReadingEntity
+import com.findev.fintrack.data.local.entity.MeterType
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
 import com.findev.fintrack.data.local.entity.RecurringPaymentEntity
 import com.findev.fintrack.loanengine.LoanSummary
@@ -229,6 +233,96 @@ class MonthlyObligationsTest {
         // June has 30 days; the occurrence clamps to the 30th rather than skipping the month.
         assertEquals(100_000L, result.recurringMinor)
     }
+
+    @Test
+    fun `fixed and metered utilities count towards the month`() {
+        val fixed = meter("kap", BillingKind.FIXED, tariffMinor = 84_303)
+        val metered = meter("svet", BillingKind.METERED, tariffMinor = 636)
+        val reading = reading("r1", "svet", LocalDate.of(2026, 7, 20), amountMinor = 125_292)
+
+        val result = monthlyObligations(
+            emptyList(), emptyList(), emptyMap(), emptyMap(), july,
+            meters = listOf(fixed, metered),
+            readings = listOf(reading),
+        )
+
+        assertEquals(84_303L + 125_292L, result.utilitiesMinor)
+        assertEquals(84_303L + 125_292L, result.totalMinor)
+        assertEquals(84_303L + 125_292L, result.remainingMinor)
+        assertEquals(0L, result.paidMinor)
+    }
+
+    @Test
+    fun `a metered reading from an earlier month does not count in this one`() {
+        val metered = meter("svet", BillingKind.METERED, tariffMinor = 636)
+        val juneReading = reading("r0", "svet", LocalDate.of(2026, 6, 20), amountMinor = 100_000)
+
+        val result = monthlyObligations(
+            emptyList(), emptyList(), emptyMap(), emptyMap(), july,
+            meters = listOf(metered),
+            readings = listOf(juneReading),
+        )
+
+        assertEquals(0L, result.utilitiesMinor)
+    }
+
+    @Test
+    fun `paid utilities drop out of the remaining figure`() {
+        val fixed = meter("kap", BillingKind.FIXED, tariffMinor = 84_303)
+        val metered = meter("svet", BillingKind.METERED, tariffMinor = 636)
+        val reading = reading("r1", "svet", LocalDate.of(2026, 7, 20), amountMinor = 125_292)
+
+        val firstOfJuly = LocalDate.of(2026, 7, 1).toEpochDay()
+        val readingDay = LocalDate.of(2026, 7, 20).toEpochDay()
+
+        val result = monthlyObligations(
+            emptyList(), emptyList(),
+            // Fixed settled for its month, metered reading settled by its id.
+            paidThrough = mapOf("kap" to firstOfJuly, "r1" to readingDay),
+            paidAmounts = mapOf(
+                ("kap" to firstOfJuly) to 84_303L,
+                ("r1" to readingDay) to 125_292L,
+            ),
+            month = july,
+            meters = listOf(fixed, metered),
+            readings = listOf(reading),
+        )
+
+        assertEquals(84_303L + 125_292L, result.totalMinor)
+        assertEquals(84_303L + 125_292L, result.paidMinor)
+        assertEquals(0L, result.remainingMinor)
+    }
+
+    private fun meter(
+        id: String,
+        billing: BillingKind,
+        tariffMinor: Long,
+        normMilli: Long = 0,
+    ) = MeterEntity(
+        id = id,
+        name = id,
+        type = MeterType.OTHER,
+        billing = billing,
+        tariffMinor = tariffMinor,
+        normMilli = normMilli,
+        reminderDay = if (billing == BillingKind.METERED) 5 else 0,
+        updatedAt = 0,
+    )
+
+    private fun reading(
+        id: String,
+        meterId: String,
+        date: LocalDate,
+        amountMinor: Long,
+    ) = MeterReadingEntity(
+        id = id,
+        meterId = meterId,
+        valueMilli = 0,
+        dateEpochDay = date.toEpochDay(),
+        tariffMinor = 0,
+        amountMinor = amountMinor,
+        updatedAt = 0,
+    )
 
     private fun recurring(
         id: String,

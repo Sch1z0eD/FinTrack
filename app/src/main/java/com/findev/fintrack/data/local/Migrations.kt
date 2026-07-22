@@ -161,3 +161,47 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("ALTER TABLE loan ADD COLUMN first_payment_epoch_day INTEGER")
     }
 }
+
+/**
+ * 5 -> 6: accounts gain a manual sort order.
+ *
+ * Accounts used to sort by name in the picker and the list; the user wants to decide the
+ * order. Existing accounts seed their position from rowid so they keep a stable, distinct
+ * order (their creation order) rather than all colliding on 0 - reordering renormalises to
+ * 0..n-1 from there.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE account ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE account SET position = rowid")
+    }
+}
+
+/**
+ * 6 -> 7: categories gain a manual sort order (same idea as accounts).
+ *
+ * position is per-type in use - the grid and the list query one type at a time - but seeding
+ * it from rowid still gives every existing category a distinct, stable start; reordering
+ * renormalises a type's categories to 0..n-1 from there.
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE category ADD COLUMN position INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE category SET position = rowid")
+    }
+}
+
+/**
+ * 7 -> 8: transactions gain a stable creation time.
+ *
+ * The feed sorted a day's rows by updated_at, so deleting-and-undoing a transaction (both bump
+ * updated_at) shuffled it to the top of its day. created_at is set once and never touched, so
+ * the order is stable. Existing rows have no separate creation time, so it is seeded from
+ * updated_at - the best estimate available and monotonic with entry order.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE transactions ADD COLUMN created_at INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE transactions SET created_at = updated_at")
+    }
+}

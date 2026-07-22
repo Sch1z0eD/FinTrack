@@ -20,6 +20,11 @@ data class TransactionListItem(
     @ColumnInfo(name = "note")
     val note: String?,
 
+    /** Null for transfers, which carry no category. Kept alongside the name so the feed can
+     *  be filtered to one category without leaning on names, which are not unique across types. */
+    @ColumnInfo(name = "category_id")
+    val categoryId: String?,
+
     /** Null for transfers, which carry no category. */
     @ColumnInfo(name = "category_name")
     val categoryName: String?,

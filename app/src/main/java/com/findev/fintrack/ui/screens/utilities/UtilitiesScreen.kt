@@ -53,7 +53,9 @@ import com.findev.fintrack.ui.UndoSnackbarHost
 import com.findev.fintrack.ui.showUndo
 import com.findev.fintrack.data.monthlyChargeMinor
 import com.findev.fintrack.data.local.entity.BillingKind
+import com.findev.fintrack.data.local.entity.MeterGroupEntity
 import com.findev.fintrack.ui.AppMenu
+import com.findev.fintrack.ui.ConfirmDeleteDialog
 import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.NotificationPermissionRequest
 import com.findev.fintrack.ui.dateLabel
@@ -78,6 +80,7 @@ fun UtilitiesScreen(
     val paidUndo by viewModel.paidUndo.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val keyboard = LocalSoftwareKeyboardController.current
+    var pendingDeleteGroup by remember { mutableStateOf<MeterGroupEntity?>(null) }
 
     // A metered meter with a reminder day is the reason the reading reminder needs to be
     // able to post - ask once one exists.
@@ -152,7 +155,7 @@ fun UtilitiesScreen(
                             hasPayable = payable.isNotEmpty(),
                             allSelected = payable.isNotEmpty() && payable.all { it.meter.id in state.selectedIds },
                             onRename = { section.group?.let(viewModel::onRenameGroupClick) },
-                            onDelete = { section.group?.let(viewModel::onDeleteGroup) },
+                            onDelete = { pendingDeleteGroup = section.group },
                             onSubmitReadings = { section.group?.let { onSubmitGroupReadings(it.id) } },
                             onToggleGroup = { viewModel.onToggleGroup(section) },
                         )
@@ -198,6 +201,15 @@ fun UtilitiesScreen(
             onDateChange = viewModel::onPayDateChange,
             onConfirm = viewModel::onPayConfirm,
             onDismiss = viewModel::onPayDismiss,
+        )
+    }
+
+    pendingDeleteGroup?.let { group ->
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.group_delete),
+            message = stringResource(R.string.group_delete_confirm, group.name),
+            onConfirm = { viewModel.onDeleteGroup(group) },
+            onDismiss = { pendingDeleteGroup = null },
         )
     }
 }

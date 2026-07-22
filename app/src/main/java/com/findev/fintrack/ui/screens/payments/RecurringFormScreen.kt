@@ -45,6 +45,7 @@ import com.findev.fintrack.R
 import com.findev.fintrack.data.local.entity.RecurrencePeriod
 import com.findev.fintrack.ui.AppAssistChip
 import com.findev.fintrack.ui.ChipRow
+import com.findev.fintrack.ui.ConfirmDeleteDialog
 import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.dateLabel
 
@@ -59,6 +60,7 @@ fun RecurringFormScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var datePickerFor by remember { mutableStateOf<DateField?>(null) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.saved.collect { onDone() } }
 
@@ -88,7 +90,7 @@ fun RecurringFormScreen(
                 },
                 actions = {
                     if (state.isEditing) {
-                        IconButton(onClick = viewModel::onDelete) {
+                        IconButton(onClick = { confirmDelete = true }) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.recurring_delete),
@@ -261,6 +263,15 @@ fun RecurringFormScreen(
         ) {
             DatePicker(state = pickerState)
         }
+    }
+
+    if (confirmDelete) {
+        ConfirmDeleteDialog(
+            title = stringResource(R.string.recurring_delete),
+            message = stringResource(R.string.recurring_delete_confirm, state.name),
+            onConfirm = viewModel::onDelete,
+            onDismiss = { confirmDelete = false },
+        )
     }
 }
 

@@ -21,18 +21,28 @@ import com.findev.fintrack.loanengine.PrepaymentMode as EnginePrepaymentMode
  * instead of silently at runtime.
  */
 
-fun LoanEntity.toEngineLoan(): EngineLoan = EngineLoan(
-    type = type.toEngine(),
-    principalMinor = principalMinor,
-    annualRateMilliPercent = rateMilliPercent,
-    startDate = LocalDate.ofEpochDay(startDateEpochDay),
-    termMonths = termMonths,
-    paymentDay = paymentDay,
-    upfrontFeeMinor = upfrontFeeMinor,
-    monthlyFeeMinor = monthlyFeeMinor,
-    fixedPaymentMinor = fixedPaymentMinor,
-    firstPaymentDate = firstPaymentEpochDay?.let(LocalDate::ofEpochDay),
-)
+fun LoanEntity.toEngineLoan(): EngineLoan {
+    val start = LocalDate.ofEpochDay(startDateEpochDay)
+    // The engine rejects a first payment on or before the start date. A loan can already
+    // hold such a value - saved before the picker blocked it, or after the start date was
+    // edited past it - so drop it back to the default rather than let generateSchedule
+    // throw and make the loan impossible to open.
+    val firstPayment = firstPaymentEpochDay
+        ?.let(LocalDate::ofEpochDay)
+        ?.takeIf { it.isAfter(start) }
+    return EngineLoan(
+        type = type.toEngine(),
+        principalMinor = principalMinor,
+        annualRateMilliPercent = rateMilliPercent,
+        startDate = start,
+        termMonths = termMonths,
+        paymentDay = paymentDay,
+        upfrontFeeMinor = upfrontFeeMinor,
+        monthlyFeeMinor = monthlyFeeMinor,
+        fixedPaymentMinor = fixedPaymentMinor,
+        firstPaymentDate = firstPayment,
+    )
+}
 
 fun LoanRateEntity.toRateChange(): RateChange = RateChange(
     effectiveFrom = LocalDate.ofEpochDay(effectiveFromEpochDay),

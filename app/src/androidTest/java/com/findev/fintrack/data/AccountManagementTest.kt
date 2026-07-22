@@ -145,6 +145,7 @@ class AccountManagementTest {
                 categoryId = null,
                 dateEpochDay = 20_000,
                 updatedAt = System.currentTimeMillis(),
+                createdAt = System.currentTimeMillis(),
             ),
         )
 

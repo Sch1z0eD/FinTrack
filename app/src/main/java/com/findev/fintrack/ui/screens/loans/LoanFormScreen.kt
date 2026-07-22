@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
@@ -56,6 +57,7 @@ import com.findev.fintrack.ui.PillSelector
 import com.findev.fintrack.ui.FieldShape
 import com.findev.fintrack.ui.GlassAlertDialog
 import com.findev.fintrack.ui.dateLabel
+import java.time.LocalDate
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
@@ -296,9 +298,23 @@ fun LoanFormScreen(
     // A loan drags its rate history and prepayments with it, and one stray tap on a
     // top-bar icon should not take all of that.
     if (showFirstPaymentPicker) {
+        // The engine requires the first payment to fall strictly after the loan start
+        // (Loan.kt), so a same-day pick is not a valid schedule - block it in the picker
+        // rather than letting it save a loan that then crashes on every open.
+        val startEpochDay = state.startDateEpochDay
+        val firstPaymentDates = remember(startEpochDay) {
+            object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    utcTimeMillis / MILLIS_PER_DAY > startEpochDay
+
+                override fun isSelectableYear(year: Int): Boolean =
+                    year >= LocalDate.ofEpochDay(startEpochDay).year
+            }
+        }
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis =
-            (state.firstPaymentEpochDay ?: state.startDateEpochDay) * MILLIS_PER_DAY,
+            (state.firstPaymentEpochDay ?: (startEpochDay + 1)) * MILLIS_PER_DAY,
+            selectableDates = firstPaymentDates,
         )
         DatePickerDialog(
             onDismissRequest = { showFirstPaymentPicker = false },

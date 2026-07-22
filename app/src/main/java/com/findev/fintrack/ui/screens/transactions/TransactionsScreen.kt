@@ -127,17 +127,42 @@ fun TransactionsScreen(
                 leading = {
                     // Same line as the period control: two stacked filter rows ate the top
                     // of a screen that exists to show the list below them.
-                    val options = listOf(
-                        TypeFilter.ALL to stringResource(R.string.filter_all),
-                        TypeFilter.EXPENSE to stringResource(R.string.filter_expense),
-                        TypeFilter.INCOME to stringResource(R.string.filter_income),
-                    )
-                    FilterDropdown(
-                        label = options.first { it.first == state.typeFilter }.second,
-                        options = options,
-                        selected = state.typeFilter,
-                        onSelected = viewModel::onTypeFilterChange,
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val typeOptions = listOf(
+                            TypeFilter.ALL to stringResource(R.string.filter_all),
+                            TypeFilter.EXPENSE to stringResource(R.string.filter_expense),
+                            TypeFilter.INCOME to stringResource(R.string.filter_income),
+                        )
+                        FilterDropdown(
+                            label = typeOptions.first { it.first == state.typeFilter }.second,
+                            options = typeOptions,
+                            selected = state.typeFilter,
+                            onSelected = viewModel::onTypeFilterChange,
+                        )
+
+                        // Only when there is more than one category to choose between - a single
+                        // category (or none, on an all-transfer feed) is nothing to filter by.
+                        if (state.categoryOptions.size > 1) {
+                            val allLabel = stringResource(R.string.filter_category_all)
+                            val categoryOptions = listOf<Pair<String?, String>>(null to allLabel) +
+                                state.categoryOptions.map { it.id to it.name }
+                            val selectedName = state.categoryOptions
+                                .firstOrNull { it.id == state.categoryFilter }?.name
+                            FilterDropdown(
+                                // Truncated so a long category name cannot push the period
+                                // control off the row.
+                                label = (selectedName ?: allLabel).let {
+                                    if (it.length > 14) it.take(13) + "…" else it
+                                },
+                                options = categoryOptions,
+                                selected = state.categoryFilter,
+                                onSelected = viewModel::onCategoryFilterChange,
+                            )
+                        }
+                    }
                 },
             )
 

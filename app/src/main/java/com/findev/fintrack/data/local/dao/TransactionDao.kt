@@ -48,7 +48,7 @@ interface TransactionDao {
             "FROM transactions " +
             "WHERE is_deleted = 0 AND settles_payment_id = :paymentId " +
             "AND settles_due_epoch_day IS NOT NULL " +
-            "ORDER BY date_epoch_day DESC, updated_at DESC",
+            "ORDER BY date_epoch_day DESC, created_at DESC",
     )
     fun observeSettlements(paymentId: String): Flow<List<SettlementRow>>
 
@@ -117,6 +117,7 @@ interface TransactionDao {
                t.amount_minor AS amount_minor,
                t.date_epoch_day AS date_epoch_day,
                t.note AS note,
+               t.category_id AS category_id,
                c.name AS category_name,
                c.icon AS category_icon,
                c.color AS category_color,
@@ -126,7 +127,7 @@ interface TransactionDao {
         JOIN account a ON a.id = t.account_id
         LEFT JOIN category c ON c.id = t.category_id
         WHERE t.is_deleted = 0
-        ORDER BY t.date_epoch_day DESC, t.updated_at DESC
+        ORDER BY t.date_epoch_day DESC, t.created_at DESC
         """,
     )
     fun observeList(): Flow<List<TransactionListItem>>

@@ -20,6 +20,7 @@
     <string name="overview_obligations">Обязательные в этом месяце</string>
     <string name="overview_obligations_loans">Кредиты</string>
     <string name="overview_obligations_recurring">Регулярные</string>
+    <string name="overview_obligations_utilities">ЖКХ</string>
     <string name="overview_obligations_paid">Оплачено %1$s из %2$s</string>
     <string name="overview_obligations_left">Осталось</string>
     <string name="overview_obligations_all_paid">Всё оплачено</string>
@@ -112,6 +113,7 @@
     <string name="filter_all">Всё</string>
     <string name="filter_expense">Расходы</string>
     <string name="filter_income">Доходы</string>
+    <string name="filter_category_all">Категория</string>
     <string name="period_week">Неделя</string>
     <string name="period_quarter">3 месяца</string>
     <string name="period_all">Всё время</string>
@@ -156,6 +158,8 @@
     <string name="accounts_edit">Изменить</string>
     <string name="accounts_actions">Действия</string>
     <string name="accounts_delete_blocked">Счёт с операциями удалить нельзя — отправьте его в архив</string>
+    <string name="accounts_delete_confirm">Удалить счёт «%1$s»?</string>
+    <string name="accounts_delete_title">Удалить счёт</string>
     <string name="accounts_open">Управление счетами</string>
     <string name="account_edit_title">Изменить счёт</string>
     <string name="account_save">Сохранить</string>
@@ -200,6 +204,7 @@
     <string name="recurring_account">Счёт</string>
     <string name="recurring_category">Категория</string>
     <string name="recurring_delete">Удалить платёж</string>
+    <string name="recurring_delete_confirm">Удалить платёж «%1$s»? История его оплат тоже пропадёт</string>
     <string name="recurring_next">Ближайший %1$s</string>
     <string name="recurring_progress">Оплачено %1$d из %2$d</string>
     <string name="recurring_remaining">Осталось выплатить</string>
@@ -339,6 +344,7 @@
     <string name="meter_reminder_day">День напоминания</string>
     <string name="meter_reminder_hint">Число месяца, когда напомнить передать показания</string>
     <string name="meter_delete">Удалить счётчик</string>
+    <string name="meter_delete_confirm">Удалить счётчик «%1$s»? Его показания и история пропадут</string>
     <string name="meter_tariff_now">%1$s за %2$s</string>
     <string name="meter_tariff_hint">Новый тариф применится только к новым показаниям — прошлые считались по своему</string>
     <string name="meter_drainage">Водоотведение за %1$s</string>
@@ -382,6 +388,7 @@
     <string name="group_create">Создать группу</string>
     <string name="group_rename">Переименовать</string>
     <string name="group_delete">Удалить группу</string>
+    <string name="group_delete_confirm">Удалить группу «%1$s»? Счётчики останутся и перейдут в «Прочее»</string>
     <string name="group_no_meters">Пока без счётчиков</string>
     <string name="group_menu">Меню группы</string>
     <string name="group_name">Название группы</string>
@@ -425,6 +432,8 @@
     <string name="categories_archive">В архив</string>
     <string name="categories_unarchive">Вернуть из архива</string>
     <string name="categories_delete_blocked">Категория используется в операциях — отправьте её в архив</string>
+    <string name="categories_delete_confirm">Удалить категорию «%1$s»?</string>
+    <string name="categories_delete_title">Удалить категорию</string>
     <string name="categories_empty_type">Нет категорий</string>
 
     <!-- Default categories, inserted once when the database is created. -->

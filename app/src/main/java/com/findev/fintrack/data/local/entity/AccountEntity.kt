@@ -24,6 +24,15 @@ data class AccountEntity(
     @ColumnInfo(name = "is_archived")
     val isArchived: Boolean = false,
 
+    /**
+     * Manual sort order, low first. The transaction picker and the accounts screen both
+     * follow it, so the user decides which account leads rather than it being fixed by
+     * creation time.
+     */
+    // defaultValue mirrors the migration's DEFAULT 0 so Room's schema check matches.
+    @ColumnInfo(name = "position", defaultValue = "0")
+    val position: Int = 0,
+
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long,
 

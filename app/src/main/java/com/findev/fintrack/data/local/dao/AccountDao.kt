@@ -10,13 +10,20 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface AccountDao {
 
-    /** Everything the user still owns, archived included. */
-    @Query("SELECT * FROM account WHERE is_deleted = 0 ORDER BY is_archived, name")
+    /** Everything the user still owns, archived included. Manual order, archived last. */
+    @Query("SELECT * FROM account WHERE is_deleted = 0 ORDER BY is_archived, position, name")
     fun observeAll(): Flow<List<AccountEntity>>
 
-    /** Only accounts that may receive new transactions. */
-    @Query("SELECT * FROM account WHERE is_deleted = 0 AND is_archived = 0 ORDER BY name")
+    /** Only accounts that may receive new transactions, in the user's chosen order. */
+    @Query("SELECT * FROM account WHERE is_deleted = 0 AND is_archived = 0 ORDER BY position, name")
     fun observeActive(): Flow<List<AccountEntity>>
+
+    /** Next free sort position, so a new account lands at the end. */
+    @Query("SELECT COALESCE(MAX(position), -1) + 1 FROM account WHERE is_deleted = 0")
+    suspend fun nextPosition(): Int
+
+    @Query("UPDATE account SET position = :position, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updatePosition(id: String, position: Int, updatedAt: Long)
 
     @Query("SELECT * FROM account WHERE id = :id")
     suspend fun getById(id: String): AccountEntity?

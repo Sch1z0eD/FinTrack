@@ -26,10 +26,24 @@ class AccountRepository @Inject constructor(
                 id = id,
                 name = name,
                 initialBalanceMinor = initialBalanceMinor,
+                // New accounts go to the end of the manual order.
+                position = accountDao.nextPosition(),
                 updatedAt = System.currentTimeMillis(),
             ),
         )
         return id
+    }
+
+    /**
+     * Writes [orderedIds] as the new sort order, renumbering to 0..n-1. The caller passes the
+     * full desired order (e.g. after a move up/down); positions stay contiguous so later moves
+     * never run into ties.
+     */
+    suspend fun reorder(orderedIds: List<String>) {
+        val now = System.currentTimeMillis()
+        orderedIds.forEachIndexed { index, id ->
+            accountDao.updatePosition(id, index, now)
+        }
     }
 
     suspend fun rename(id: String, name: String, initialBalanceMinor: Long) {
