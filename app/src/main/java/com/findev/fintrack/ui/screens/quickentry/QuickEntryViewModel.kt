@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.findev.fintrack.data.AccountRepository
 import com.findev.fintrack.data.CategoryRepository
 import com.findev.fintrack.data.TransactionRepository
+import com.findev.fintrack.notification.BudgetAlerts
 import com.findev.fintrack.data.local.entity.AccountEntity
 import com.findev.fintrack.data.local.entity.CategoryEntity
 import com.findev.fintrack.data.local.entity.CategoryType
@@ -88,6 +89,7 @@ class QuickEntryViewModel @Inject constructor(
     private val accountRepository: AccountRepository,
     private val categoryRepository: CategoryRepository,
     private val transactionRepository: TransactionRepository,
+    private val budgetAlerts: BudgetAlerts,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -258,6 +260,10 @@ class QuickEntryViewModel @Inject constructor(
                     dateEpochDay = state.dateEpochDay,
                     note = note,
                 )
+                // Only a fresh expense can newly cross a budget; edits and income cannot.
+                if (state.type == TransactionType.EXPENSE) {
+                    budgetAlerts.onExpenseAdded(categoryId, state.dateEpochDay, state.amountMinor)
+                }
             } else {
                 transactionRepository.updateIncomeOrExpense(
                     id = editedTransactionId,

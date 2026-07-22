@@ -25,6 +25,10 @@ class TransactionRepository @Inject constructor(
     ): Flow<List<CategoryTotal>> =
         transactionDao.observeExpensesByCategory(fromEpochDay, toEpochDay, accountId)
 
+    /** Expense total for one category over a day range (inclusive), for the budget check. */
+    suspend fun sumExpenseForCategory(categoryId: String, fromEpochDay: Long, toEpochDay: Long): Long =
+        transactionDao.sumExpenseForCategory(categoryId, fromEpochDay, toEpochDay)
+
     /** Income/expense sums per month from [fromEpochDay] onward, oldest first (gaps not filled). */
     fun observeMonthlyTotals(fromEpochDay: Long, accountId: String? = null): Flow<List<MonthlyTotal>> =
         transactionDao.observeMonthlyTotals(fromEpochDay, accountId)

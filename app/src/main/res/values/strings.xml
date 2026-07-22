@@ -242,6 +242,11 @@
     <string name="loan_reminder_title">Скоро платёж по кредиту: %1$s</string>
     <string name="meter_reminder_text">Счётчик «%1$s» — время снять показания</string>
     <string name="meter_reminder_pay_text">«%1$s» — пора оплатить</string>
+    <string name="budget_alert_channel_name">Бюджеты категорий</string>
+    <string name="budget_alert_channel_description">Уведомление, когда траты по категории подходят к лимиту или превышают его</string>
+    <string name="budget_alert_near_title">Бюджет на исходе</string>
+    <string name="budget_alert_over_title">Превышен бюджет</string>
+    <string name="budget_alert_text">%1$s: потрачено %2$s из %3$s</string>
 
     <!-- Loans -->
     <string name="loans_next_payment">Платёж %1$s</string>

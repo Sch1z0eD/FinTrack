@@ -3,6 +3,7 @@ package com.findev.fintrack
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.findev.fintrack.notification.BudgetAlerts
 import com.findev.fintrack.notification.LoanReminderScheduler
 import com.findev.fintrack.notification.MeterReminderScheduler
 import com.findev.fintrack.notification.PaymentReminderScheduler
@@ -25,6 +26,9 @@ class FinTrackApplication : Application(), Configuration.Provider {
 
     @Inject
     lateinit var loanReminderScheduler: LoanReminderScheduler
+
+    @Inject
+    lateinit var budgetAlerts: BudgetAlerts
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
@@ -54,6 +58,8 @@ class FinTrackApplication : Application(), Configuration.Provider {
 
         loanReminderScheduler.createChannel()
         loanReminderScheduler.observeLoans(scope)
+
+        budgetAlerts.createChannel()
 
         updateChecks.setUp()
 

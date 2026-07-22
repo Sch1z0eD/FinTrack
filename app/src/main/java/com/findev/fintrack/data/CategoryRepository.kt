@@ -16,6 +16,9 @@ class CategoryRepository @Inject constructor(
     /** Archived included - for the categories screen. */
     fun observeAll(): Flow<List<CategoryEntity>> = categoryDao.observeAll()
 
+    /** A single category by id, or null if it was deleted - used by the budget check. */
+    suspend fun getById(id: String): CategoryEntity? = categoryDao.getById(id)
+
     /** For the quick-entry grid. */
     fun observeByType(type: CategoryType): Flow<List<CategoryEntity>> =
         categoryDao.observeByType(type)

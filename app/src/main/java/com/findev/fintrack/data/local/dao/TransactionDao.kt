@@ -161,6 +161,18 @@ interface TransactionDao {
         accountId: String?,
     ): Flow<List<CategoryTotal>>
 
+    /** One-shot expense total for a single category over a day range - for the budget check. */
+    @Query(
+        """
+        SELECT COALESCE(SUM(amount_minor), 0) FROM transactions
+        WHERE is_deleted = 0
+          AND type = 'EXPENSE'
+          AND category_id = :categoryId
+          AND date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
+        """,
+    )
+    suspend fun sumExpenseForCategory(categoryId: String, fromEpochDay: Long, toEpochDay: Long): Long
+
     /**
      * Income and expense sums per calendar month from [fromEpochDay] onward, oldest first -
      * the shape a monthly trend chart needs. Transfers are excluded. The epoch day is turned
