@@ -1,20 +1,88 @@
-MIT License
+FinTrack — Proprietary Software License
+Copyright (c) 2026 Sch1z0eD. All rights reserved.
 
-Copyright (c) 2026 Sch1z0eD
+1. Definitions
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+   "Software" means the FinTrack application together with its source code,
+   object code, build scripts, resources, assets, documentation, and any other
+   material contained in this repository.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+   "Licensor" means Sch1z0eD, the sole copyright holder and owner of the
+   Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR OTHER DEALINGS IN THE SOFTWARE.
+   "You" means any individual or legal entity that accesses, obtains, or
+   otherwise interacts with the Software.
+
+2. Ownership
+
+   The Software is the exclusive property of the Licensor and is protected by
+   copyright law and international treaties. The Licensor retains all right,
+   title, and interest in and to the Software, including all intellectual
+   property rights. No ownership rights are transferred to You under this
+   license.
+
+3. No License Granted
+
+   Except for the limited permission expressly stated in Section 4, no rights
+   or licenses are granted to You, whether by implication, estoppel, or
+   otherwise. Without the prior written permission of the Licensor, You may NOT:
+
+     (a) use, run, or execute the Software for any purpose;
+     (b) copy, reproduce, or store the Software, in whole or in part;
+     (c) modify, adapt, translate, or create derivative works of the Software;
+     (d) merge or incorporate the Software into any other work;
+     (e) publish, distribute, sublicense, lease, rent, lend, sell, or otherwise
+         transfer the Software or make it available to any third party;
+     (f) publicly display or represent the Software, or any part of it, as Your
+         own work;
+     (g) remove, alter, or obscure any copyright, trademark, or other
+         proprietary notice contained in the Software.
+
+4. Limited Permission to View
+
+   The Software is published in a public repository solely for viewing and
+   reference. You are permitted only to view the source code as displayed by
+   the hosting platform. This permission does not grant any right to download,
+   build, execute, reproduce, modify, or redistribute the Software.
+
+5. Exclusive Commercial Rights
+
+   All rights to commercially exploit the Software — including, without
+   limitation, the right to distribute, sell, license, publish (including on any
+   application store), or otherwise derive revenue from the Software — are
+   reserved exclusively to the Licensor. No other party may derive any
+   commercial benefit or profit from the Software or any part of it.
+
+6. Requesting Permission
+
+   Any use beyond the limited permission in Section 4 requires a separate
+   written agreement with the Licensor. Requests may be directed to the
+   Licensor through the contact channels associated with this repository.
+
+7. Trademarks
+
+   The names "FinTrack" and "findev", and any associated logos, are trademarks
+   of the Licensor. Nothing in this license grants You any right to use them.
+
+8. Termination
+
+   Any breach of this license automatically and immediately terminates the
+   permission granted in Section 4, without prejudice to any other rights or
+   remedies available to the Licensor.
+
+9. No Warranty
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
+
+10. Limitation of Liability
+
+   IN NO EVENT SHALL THE LICENSOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+   FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+   IN THE SOFTWARE.
+
+11. Reservation of Rights
+
+   All rights not expressly granted herein are reserved by the Licensor.
